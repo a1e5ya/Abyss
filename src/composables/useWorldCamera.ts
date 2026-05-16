@@ -40,9 +40,11 @@ export function useWorldCamera(pathProgress: Ref<number>) {
     return Math.max(-8, Math.min(8, angle))
   })
 
-  // CSS transform applied to the world container
+  // CSS transform applied to the world container.
+  // calc(50vw - cameraX) places the camera point at the viewport's horizontal center,
+  // calc(50vh - cameraY) places it at the vertical center.
   const worldTransform = computed(() =>
-    `translate(${-cameraX.value}px, ${-cameraY.value}px) rotate(${rotation.value}deg)`
+    `translate(calc(50vw - ${cameraX.value}px), calc(50vh - ${cameraY.value}px)) rotate(${rotation.value}deg)`
   )
 
   return { cameraX, cameraY, rotation, worldTransform }

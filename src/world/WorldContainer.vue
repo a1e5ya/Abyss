@@ -63,11 +63,10 @@ const { cameraX, cameraY, rotation, worldTransform } = useWorldCamera(pathProgre
 /* World — the fabric that moves */
 .world {
   position: absolute;
-  /* Origin at viewport center so rotation pivots correctly */
-  top: 50%;
-  left: 50%;
+  top: 0;
+  left: 0;
   width: 4000px;
-  transform-origin: center center;
+  transform-origin: 50vw 50vh;
   will-change: transform;
 }
 

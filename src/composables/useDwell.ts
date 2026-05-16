@@ -5,7 +5,7 @@ import { ABYSS3_SPURS, spurJunction, cameraOverridePos, cursorWorldX, cursorWorl
 import type { Spur } from './useWorldCamera'
 
 const DWELL_RADIUS   = 200
-const DWELL_SECONDS  = 3
+const DWELL_SECONDS  = 0.5
 const TRAVEL_SECONDS = 1.0
 const RETURN_SECONDS = 0.9
 

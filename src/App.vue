@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import WorldContainer from './world/WorldContainer.vue'
 import {
   WAYPOINTS, ABYSS3_SPURS,
-  getTangentAngle, buildSvgPath, progressOf,
+  getTangentAngle, buildSvgPath, buildSpineSegment, progressOf,
   spurRibbonPath, spurCenterPath, spurObjectAngle, spurJunction,
 } from './composables/useWorldCamera'
 import { useViewport } from './composables/useViewport'
@@ -92,6 +92,8 @@ function abyss3ObjStyle(obj: typeof ABYSS3_OBJECTS[0]) {
 }
 
 const svgPath = buildSvgPath()
+// Wide spine overlay covering the full Abyss 3 Sankey section
+const abyss3SpinePath = buildSpineSegment(0.44, 0.56)
 </script>
 
 <template>
@@ -130,6 +132,16 @@ const svgPath = buildSvgPath()
 
     <!-- Path spine + Sankey ribbons -->
     <svg class="path-spine" viewBox="0 0 4000 14000" preserveAspectRatio="none">
+      <!-- Wide spine through Abyss 3 Sankey section — matches ribbon origin width -->
+      <path
+        :d="abyss3SpinePath"
+        fill="none"
+        stroke="rgba(201,149,108,0.12)"
+        stroke-width="180"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+
       <!-- Sankey ribbons (filled, behind spine) -->
       <path
         v-for="spur in ABYSS3_SPURS" :key="'r-'+spur.label"

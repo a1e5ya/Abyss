@@ -59,6 +59,18 @@ export function getTangentAngle(progress: number): number {
   return Math.atan2(dx, dy) * (180 / Math.PI)
 }
 
+// Polyline approximation of the spine between two progress values.
+// Used to draw a thick "wide spine" segment (e.g., Abyss 3 Sankey section).
+export function buildSpineSegment(fromProgress: number, toProgress: number, steps = 40): string {
+  const pts: string[] = []
+  for (let i = 0; i <= steps; i++) {
+    const p = fromProgress + (toProgress - fromProgress) * (i / steps)
+    const { x, y } = evalSpline(p)
+    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`)
+  }
+  return `M ${pts.join(' L ')}`
+}
+
 export function buildSvgPath(): string {
   const pts = WAYPOINTS
   let d = `M ${pts[0].x} ${pts[0].y}`

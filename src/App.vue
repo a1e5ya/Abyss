@@ -1,100 +1,75 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import WorldContainer from './world/WorldContainer.vue'
-import BranchFork from './world/BranchFork.vue'
-import { getTangentAngle } from './composables/useWorldCamera'
-import { MAIN_BEFORE, MAIN_AFTER, buildSvgPath } from './composables/usePath'
+import { WAYPOINTS, getTangentAngle, buildSvgPath } from './composables/useWorldCamera'
 import { useViewport } from './composables/useViewport'
 
 const { vw, vh } = useViewport()
 
-// Station size: matches viewport aspect ratio, clamped between 50% and 100% of viewport
-const stationW = computed(() => Math.round(Math.max(vw.value * 0.5, Math.min(vw.value, vh.value * (vw.value / vh.value)))))
-const stationH = computed(() => Math.round(Math.max(vh.value * 0.5, Math.min(vh.value, vw.value * (vh.value / vw.value)))))
-
 const WORLD_HEIGHT = 14000
 
+// Station size: viewport aspect ratio, clamped 50–100% of viewport
+const stationW = computed(() => Math.round(Math.min(vw.value, Math.max(vw.value * 0.5, vh.value * vw.value / vh.value))))
+const stationH = computed(() => Math.round(Math.min(vh.value, Math.max(vh.value * 0.5, vw.value * vh.value / vw.value))))
+
+// Stations sit on even-indexed waypoints
 const STATIONS = [
-  { label: 'HERO',             y: 0,     progress: 0 / WORLD_HEIGHT },
-  { label: 'PORTRAIT GALLERY', y: 2800,  progress: 2800 / WORLD_HEIGHT },
-  { label: 'PRODUCT GALLERY',  y: 5600,  progress: 5600 / WORLD_HEIGHT },
-  { label: 'WEB PROJECTS',     y: 8400,  progress: 8400 / WORLD_HEIGHT },
-  { label: '3D WORKS',         y: 11200, progress: 11200 / WORLD_HEIGHT },
-  { label: 'CONTACTS',         y: 14000, progress: 14000 / WORLD_HEIGHT },
+  { label: 'HERO',             waypointIndex: 0  },
+  { label: 'PORTRAIT GALLERY', waypointIndex: 2  },
+  { label: 'PRODUCT GALLERY',  waypointIndex: 4  },
+  { label: 'WEB PROJECTS',     waypointIndex: 6  },
+  { label: '3D WORKS',         waypointIndex: 8  },
+  { label: 'CONTACTS',         waypointIndex: 10 },
 ]
 
-// Main path x at each station (y=2000 for all stations on the spine)
-const STATION_X = 2000
+// Abyss markers sit on odd-indexed waypoints
+const ABYSSES = [
+  { label: 'abyss 1', waypointIndex: 1 },
+  { label: 'abyss 2', waypointIndex: 3 },
+  { label: 'abyss 3', waypointIndex: 5 },
+  { label: 'abyss 4', waypointIndex: 7 },
+  { label: 'abyss 5', waypointIndex: 9 },
+]
 
-function stationStyle(progress: number) {
+function objectStyle(waypointIndex: number, w: number, h: number) {
+  const progress = (WAYPOINTS[waypointIndex].y) / WORLD_HEIGHT
   const angle = getTangentAngle(progress)
+  const wp = WAYPOINTS[waypointIndex]
   return {
-    left:      `${STATION_X}px`,
-    top:       `${progress * WORLD_HEIGHT}px`,
-    width:     `${stationW.value}px`,
-    height:    `${stationH.value}px`,
+    left:      `${wp.x}px`,
+    top:       `${wp.y}px`,
+    width:     `${w}px`,
+    height:    `${h}px`,
     transform: `translate(-50%, -50%) rotate(${-angle}deg)`,
   }
 }
 
-// Z-level test objects — placed in abyss zones at different depths
-const DEPTH_OBJECTS = [
-  // Abyss 1
-  { x: 1400, y: 1100, label: 'z −2 deep',   z: -2, color: 'var(--atmo-teal)',  scale: 0.6, blur: 'var(--blur-deep)' },
-  { x: 1600, y: 1400, label: 'z −1 mid',    z: -1, color: 'var(--atmo-rose)',  scale: 0.8, blur: 'var(--blur-mid)'  },
-  { x: 1200, y: 1700, label: 'z +1 fore',   z: 1,  color: 'var(--col-glow)',   scale: 1.1, blur: '0px'             },
-  { x: 1800, y: 1400, label: 'z +2 sphere', z: 2,  color: 'var(--col-gold)',   scale: 1.3, blur: '0px'             },
-  // Abyss 3
-  { x: 1200, y: 6700, label: 'z −2 deep',   z: -2, color: 'var(--atmo-sage)',  scale: 0.6, blur: 'var(--blur-deep)' },
-  { x: 1400, y: 7000, label: 'z +1 fore',   z: 1,  color: 'var(--iris-mint)',  scale: 1.1, blur: '0px'             },
-  { x: 1600, y: 7300, label: 'z +2 sphere', z: 2,  color: 'var(--iris-gold)',  scale: 1.3, blur: '0px'             },
-]
-
-// Combine main spine SVG (excluding fork zone)
-const mainBeforeSvg = buildSvgPath(MAIN_BEFORE)
-const mainAfterSvg  = buildSvgPath(MAIN_AFTER)
+const svgPath = buildSvgPath()
 </script>
 
 <template>
   <WorldContainer>
 
-    <!-- ── Station placeholders ───────────────────────────────────────── -->
     <div
       v-for="s in STATIONS" :key="s.label"
       class="station"
-      :style="stationStyle(s.progress)"
+      :style="objectStyle(s.waypointIndex, stationW, stationH)"
     >
       <span>{{ s.label }}</span>
-      <small>{{ stationW }} × {{ stationH }}px</small>
+      <small>{{ stationW }} × {{ stationH }}</small>
     </div>
 
-    <!-- ── Branch fork (abyss 2) ──────────────────────────────────────── -->
-    <BranchFork />
-
-    <!-- ── Z-level depth test objects ────────────────────────────────── -->
     <div
-      v-for="(obj, i) in DEPTH_OBJECTS" :key="i"
-      class="depth-obj"
-      :style="{
-        left:   `${obj.x}px`,
-        top:    `${obj.y}px`,
-        background: obj.color,
-        transform: `translate(-50%, -50%) scale(${obj.scale})`,
-        filter: `blur(${obj.blur})`,
-        zIndex: obj.z + 3,
-      }"
+      v-for="a in ABYSSES" :key="a.label"
+      class="abyss-marker"
+      :style="objectStyle(a.waypointIndex, 160, 40)"
     >
-      {{ obj.label }}
+      {{ a.label }}
     </div>
 
-    <!-- ── Path spine SVG ─────────────────────────────────────────────── -->
     <svg class="path-spine" viewBox="0 0 4000 14000" preserveAspectRatio="none">
-      <!-- Before fork -->
-      <path :d="mainBeforeSvg" fill="none" stroke="rgba(201,149,108,0.2)" stroke-width="3" stroke-dasharray="16 10" />
-      <!-- After merge -->
-      <path :d="mainAfterSvg"  fill="none" stroke="rgba(201,149,108,0.2)" stroke-width="3" stroke-dasharray="16 10" />
-      <!-- Waypoint dots -->
-      <circle v-for="(wp, i) in [...MAIN_BEFORE, ...MAIN_AFTER]" :key="i"
+      <path :d="svgPath" fill="none" stroke="rgba(201,149,108,0.2)" stroke-width="3" stroke-dasharray="16 10" />
+      <circle v-for="(wp, i) in WAYPOINTS" :key="i"
         :cx="wp.x" :cy="wp.y" r="8"
         :fill="i % 2 === 0 ? '#c9956c' : '#a855f7'"
         opacity="0.4"
@@ -127,23 +102,20 @@ const mainAfterSvg  = buildSvgPath(MAIN_AFTER)
 .station small {
   font-family: ui-monospace, monospace;
   font-size: 10px;
-  color: rgba(201, 149, 108, 0.4);
+  color: rgba(201, 149, 108, 0.3);
 }
 
-/* Depth test blobs */
-.depth-obj {
+.abyss-marker {
   position: absolute;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  color: rgba(255,255,255,0.7);
-  pointer-events: none;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--col-glow);
+  opacity: 0.45;
+  text-transform: uppercase;
 }
 
 .path-spine {

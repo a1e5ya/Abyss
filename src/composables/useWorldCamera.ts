@@ -111,9 +111,10 @@ export function spurJunction(s: Spur): { x: number; y: number } {
   return evalSpline(s.junctionProgress)
 }
 
+const JUNCTION_WIDTH = 18  // ribbon half-width where it meets the spine (px)
+
 // Sankey ribbon as a filled SVG shape.
-// At the junction: pinched to a point on the spine.
-// At the object: opens into an ellipse (approximated as two bezier curves).
+// Starts with a narrow mouth at the spine junction, fans out to a pool at the object.
 export function spurRibbonPath(s: Spur): string {
   const j  = spurJunction(s)
   const ox = s.object.x
@@ -124,29 +125,36 @@ export function spurRibbonPath(s: Spur): string {
   const dx = ox - j.x
   const dy = oy - j.y
   const len = Math.sqrt(dx * dx + dy * dy) || 1
-  const px = -dy / len   // perpendicular x
-  const py =  dx / len   // perpendicular y
+  const px = -dy / len   // perpendicular unit x
+  const py =  dx / len   // perpendicular unit y
 
-  // Object pool: left and right edge points
+  // Junction mouth: narrow but not zero — flows out of the wide spine
+  const jlx = j.x + px * JUNCTION_WIDTH
+  const jly = j.y + py * JUNCTION_WIDTH
+  const jrx = j.x - px * JUNCTION_WIDTH
+  const jry = j.y - py * JUNCTION_WIDTH
+
+  // Object pool edge points
   const lx = ox + px * w
   const ly = oy + py * w
   const rx = ox - px * w
   const ry = oy - py * w
 
-  // Control points for the bezier sides — bow outward from center
-  const mid = 0.55
-  const clx = j.x + (lx - j.x) * mid + px * w * 0.4
-  const cly = j.y + (ly - j.y) * mid + py * w * 0.4
-  const crx = j.x + (rx - j.x) * mid - px * w * 0.4
-  const cry = j.y + (ry - j.y) * mid - py * w * 0.4
+  // Bezier control points — curve bows outward as ribbon widens
+  const mid = 0.5
+  const clx = j.x + (lx - j.x) * mid + px * w * 0.35
+  const cly = j.y + (ly - j.y) * mid + py * w * 0.35
+  const crx = j.x + (rx - j.x) * mid - px * w * 0.35
+  const cry = j.y + (ry - j.y) * mid - py * w * 0.35
 
   const f = (n: number) => n.toFixed(1)
 
   return [
-    `M ${f(j.x)} ${f(j.y)}`,
+    `M ${f(jlx)} ${f(jly)}`,
     `Q ${f(clx)} ${f(cly)} ${f(lx)} ${f(ly)}`,          // left edge
-    `A ${f(w)} ${f(w)} 0 0 1 ${f(rx)} ${f(ry)}`,        // arc across the pool
-    `Q ${f(crx)} ${f(cry)} ${f(j.x)} ${f(j.y)}`,        // right edge back
+    `A ${f(w)} ${f(w)} 0 0 1 ${f(rx)} ${f(ry)}`,        // arc across pool
+    `Q ${f(crx)} ${f(cry)} ${f(jrx)} ${f(jry)}`,        // right edge back
+    `A ${f(JUNCTION_WIDTH)} ${f(JUNCTION_WIDTH)} 0 0 1 ${f(jlx)} ${f(jly)}`, // mouth arc
     'Z',
   ].join(' ')
 }

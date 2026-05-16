@@ -71,18 +71,19 @@ export function buildSvgPath(pts: Waypoint[]): string {
 
 // ─── World path definition ───────────────────────────────────────────────────
 
-// Main spine — used before the fork and after the merge
+// Main spine before the fork.
+// Rule: the last two points define the exit direction into the fork.
+// Keep them vertically aligned (same x) so the tangent at Portrait Gallery
+// points straight down — no lateral pull from the fork junction.
 export const MAIN_BEFORE: Waypoint[] = [
   { x: 2000, y: 0 },      // Hero
   { x: 1200, y: 1400 },   // Abyss 1 — swing left
   { x: 2000, y: 2800 },   // Portrait Gallery
-  // fork junction at y≈3500
-  { x: 2000, y: 3500 },
+  { x: 2000, y: 3200 },   // straight exit toward fork (same x — no twist)
 ]
 
 export const MAIN_AFTER: Waypoint[] = [
-  // merge point at y≈4900 — all branches arrive here
-  { x: 2000, y: 4900 },
+  { x: 2000, y: 5200 },   // straight entry from merge (same x — no twist)
   { x: 2000, y: 5600 },   // Product Gallery
   { x: 1200, y: 7000 },   // Abyss 3 — swing left
   { x: 2000, y: 8400 },   // Web Projects
@@ -92,31 +93,38 @@ export const MAIN_AFTER: Waypoint[] = [
   { x: 2000, y: 14000 },  // Contacts
 ]
 
-// Fork junction and merge point (world-space)
-export const FORK_Y  = 3500
-export const MERGE_Y = 4900
+// Fork junction and merge point (world-space y)
+export const FORK_Y  = 3400
+export const MERGE_Y = 5000
 
-// Three branches through abyss 2 (y 3500→4900)
-// Branch A — left swing, input: tap/click indicator
-// Branch B — center drift, input: momentum/drift
-// Branch C — right swing, input: arrow keys
+// Three branches through abyss 2 (y FORK_Y → MERGE_Y).
+// Each branch starts and ends with a vertical segment (dx=0 relative to
+// the spine) so Catmull-Rom never pulls the path backward.
+// The "ghost" points for CR at i=0 are duplicated to prevent backward pull.
 export const BRANCHES: Record<string, Waypoint[]> = {
+  // Branch A — left arc, input: tap/click label
   A: [
-    { x: 2000, y: 3500 },
-    { x: 1000, y: 4000 },  // hard left
-    { x: 1400, y: 4500 },
-    { x: 2000, y: 4900 },
+    { x: 2000, y: 3400 },  // entry — matches spine
+    { x: 2000, y: 3550 },  // short straight down before curving
+    { x: 1100, y: 3900 },  // peak left
+    { x: 1100, y: 4200 },  // linger left
+    { x: 2000, y: 4800 },  // return to center
+    { x: 2000, y: 5000 },  // exit — matches spine
   ],
+  // Branch B — straight, input: default / drift
   B: [
-    { x: 2000, y: 3500 },
-    { x: 2000, y: 4200 },  // straight through
-    { x: 2000, y: 4900 },
+    { x: 2000, y: 3400 },
+    { x: 2000, y: 4200 },
+    { x: 2000, y: 5000 },
   ],
+  // Branch C — right arc, input: arrow keys / horizontal scroll
   C: [
-    { x: 2000, y: 3500 },
-    { x: 3000, y: 4000 },  // hard right
-    { x: 2600, y: 4500 },
-    { x: 2000, y: 4900 },
+    { x: 2000, y: 3400 },  // entry
+    { x: 2000, y: 3550 },  // short straight down
+    { x: 2900, y: 3900 },  // peak right
+    { x: 2900, y: 4200 },  // linger right
+    { x: 2000, y: 4800 },  // return to center
+    { x: 2000, y: 5000 },  // exit
   ],
 }
 
@@ -127,8 +135,8 @@ export type BranchId = 'A' | 'B' | 'C'
 // The branch section (y 3500→4900) uses the active branch.
 
 const WORLD_HEIGHT = 14000
-const FORK_PROGRESS  = FORK_Y  / WORLD_HEIGHT   // ≈ 0.25
-const MERGE_PROGRESS = MERGE_Y / WORLD_HEIGHT    // ≈ 0.35
+const FORK_PROGRESS  = FORK_Y  / WORLD_HEIGHT
+const MERGE_PROGRESS = MERGE_Y / WORLD_HEIGHT
 
 export function evalWorldPoint(progress: number, branch: BranchId): Waypoint {
   if (progress <= FORK_PROGRESS) {

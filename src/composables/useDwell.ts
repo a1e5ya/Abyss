@@ -8,9 +8,9 @@ import type { Spur } from './useWorldCamera'
 export type Highpoint = Spur
 
 const ATTRACT_RADIUS = 600   // world-px — cursor within this range pulls camera
-const ATTRACT_LERP   = 0.028 // per-frame pull strength — low = dreamy float
-const RETURN_LERP    = 0.018 // slower drift back to spine
-const DWELL_SECONDS  = 0.4   // seconds hovering before camera starts moving
+const ATTRACT_LERP   = 0.004 // per-frame pull strength — very slow dreamy float
+const RETURN_LERP    = 0.003 // even slower drift back to spine
+const DWELL_SECONDS  = 0.6   // seconds hovering before camera starts moving
 
 export const highpointTarget   = ref<Highpoint | null>(null)
 export const highpointProgress = ref(0)   // 0→1 dwell fill
@@ -56,7 +56,7 @@ function tick() {
     const dx  = Math.abs(nx - junction.x)
     const dy  = Math.abs(ny - junction.y)
 
-    if (dx < 2 && dy < 2) {
+    if (dx < 8 && dy < 8) {
       // Close enough — hand back to spine
       alignScrollToY(junction.y)
       cameraOverridePos.value  = null

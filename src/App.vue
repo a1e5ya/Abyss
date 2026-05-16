@@ -1,109 +1,103 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import WorldContainer from './world/WorldContainer.vue'
-import { getTangentAngle, WAYPOINTS } from './composables/useWorldCamera'
+import BranchFork from './world/BranchFork.vue'
+import { getTangentAngle } from './composables/useWorldCamera'
+import { MAIN_BEFORE, MAIN_AFTER, buildSvgPath } from './composables/usePath'
+import { useViewport } from './composables/useViewport'
 
-// Station waypoints are the even-indexed ones (0,2,4,6,8,10)
+const { vw, vh } = useViewport()
+
+// Station size: matches viewport aspect ratio, clamped between 50% and 100% of viewport
+const stationW = computed(() => Math.round(Math.max(vw.value * 0.5, Math.min(vw.value, vh.value * (vw.value / vh.value)))))
+const stationH = computed(() => Math.round(Math.max(vh.value * 0.5, Math.min(vh.value, vw.value * (vh.value / vw.value)))))
+
+const WORLD_HEIGHT = 14000
+
 const STATIONS = [
-  { label: 'HERO',             y: 0,     waypointIndex: 0 },
-  { label: 'PORTRAIT GALLERY', y: 2800,  waypointIndex: 2 },
-  { label: 'PRODUCT GALLERY',  y: 5600,  waypointIndex: 4 },
-  { label: 'WEB PROJECTS',     y: 8400,  waypointIndex: 6 },
-  { label: '3D WORKS',         y: 11200, waypointIndex: 8 },
-  { label: 'CONTACTS',         y: 14000, waypointIndex: 10 },
+  { label: 'HERO',             y: 0,     progress: 0 / WORLD_HEIGHT },
+  { label: 'PORTRAIT GALLERY', y: 2800,  progress: 2800 / WORLD_HEIGHT },
+  { label: 'PRODUCT GALLERY',  y: 5600,  progress: 5600 / WORLD_HEIGHT },
+  { label: 'WEB PROJECTS',     y: 8400,  progress: 8400 / WORLD_HEIGHT },
+  { label: '3D WORKS',         y: 11200, progress: 11200 / WORLD_HEIGHT },
+  { label: 'CONTACTS',         y: 14000, progress: 14000 / WORLD_HEIGHT },
 ]
 
-const ABYSS = [
-  { label: 'abyss 1', waypointIndex: 1 },
-  { label: 'abyss 2', waypointIndex: 3 },
-  { label: 'abyss 3', waypointIndex: 5 },
-  { label: 'abyss 4', waypointIndex: 7 },
-  { label: 'abyss 5', waypointIndex: 9 },
-]
+// Main path x at each station (y=2000 for all stations on the spine)
+const STATION_X = 2000
 
-const totalSegments = WAYPOINTS.length - 1
-
-// For each station: counter-rotate by the negative tangent angle at its waypoint.
-// This makes the station sit flat on the path. The world rotation then tilts it
-// naturally as it moves away from the camera position.
-function stationStyle(waypointIndex: number) {
-  const progress = waypointIndex / totalSegments
+function stationStyle(progress: number) {
   const angle = getTangentAngle(progress)
-  const wp = WAYPOINTS[waypointIndex]
   return {
-    left: `${wp.x}px`,
-    top:  `${wp.y}px`,
+    left:      `${STATION_X}px`,
+    top:       `${progress * WORLD_HEIGHT}px`,
+    width:     `${stationW.value}px`,
+    height:    `${stationH.value}px`,
     transform: `translate(-50%, -50%) rotate(${-angle}deg)`,
   }
 }
 
-function abyssStyle(waypointIndex: number) {
-  const progress = waypointIndex / totalSegments
-  const angle = getTangentAngle(progress)
-  const wp = WAYPOINTS[waypointIndex]
-  return {
-    left: `${wp.x}px`,
-    top:  `${wp.y}px`,
-    transform: `translate(-50%, -50%) rotate(${-angle}deg)`,
-  }
-}
+// Z-level test objects — placed in abyss zones at different depths
+const DEPTH_OBJECTS = [
+  // Abyss 1
+  { x: 1400, y: 1100, label: 'z −2 deep',   z: -2, color: 'var(--atmo-teal)',  scale: 0.6, blur: 'var(--blur-deep)' },
+  { x: 1600, y: 1400, label: 'z −1 mid',    z: -1, color: 'var(--atmo-rose)',  scale: 0.8, blur: 'var(--blur-mid)'  },
+  { x: 1200, y: 1700, label: 'z +1 fore',   z: 1,  color: 'var(--col-glow)',   scale: 1.1, blur: '0px'             },
+  { x: 1800, y: 1400, label: 'z +2 sphere', z: 2,  color: 'var(--col-gold)',   scale: 1.3, blur: '0px'             },
+  // Abyss 3
+  { x: 1200, y: 6700, label: 'z −2 deep',   z: -2, color: 'var(--atmo-sage)',  scale: 0.6, blur: 'var(--blur-deep)' },
+  { x: 1400, y: 7000, label: 'z +1 fore',   z: 1,  color: 'var(--iris-mint)',  scale: 1.1, blur: '0px'             },
+  { x: 1600, y: 7300, label: 'z +2 sphere', z: 2,  color: 'var(--iris-gold)',  scale: 1.3, blur: '0px'             },
+]
 
-// Build smooth SVG path from waypoints (Catmull-Rom → cubic bezier)
-function buildSvgPath(pts: { x: number; y: number }[]): string {
-  let d = `M ${pts[0].x} ${pts[0].y}`
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[Math.max(0, i - 1)]
-    const p1 = pts[i]
-    const p2 = pts[i + 1]
-    const p3 = pts[Math.min(pts.length - 1, i + 2)]
-    const cp1x = p1.x + (p2.x - p0.x) / 6
-    const cp1y = p1.y + (p2.y - p0.y) / 6
-    const cp2x = p2.x - (p3.x - p1.x) / 6
-    const cp2y = p2.y - (p3.y - p1.y) / 6
-    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`
-  }
-  return d
-}
-
-const svgPath = buildSvgPath(WAYPOINTS)
+// Combine main spine SVG (excluding fork zone)
+const mainBeforeSvg = buildSvgPath(MAIN_BEFORE)
+const mainAfterSvg  = buildSvgPath(MAIN_AFTER)
 </script>
 
 <template>
   <WorldContainer>
 
-    <!-- Station placeholder blocks -->
+    <!-- ── Station placeholders ───────────────────────────────────────── -->
     <div
-      v-for="s in STATIONS"
-      :key="s.label"
+      v-for="s in STATIONS" :key="s.label"
       class="station"
-      :style="stationStyle(s.waypointIndex)"
+      :style="stationStyle(s.progress)"
     >
       <span>{{ s.label }}</span>
-      <small>y = {{ s.y }}</small>
+      <small>{{ stationW }} × {{ stationH }}px</small>
     </div>
 
-    <!-- Abyss markers -->
+    <!-- ── Branch fork (abyss 2) ──────────────────────────────────────── -->
+    <BranchFork />
+
+    <!-- ── Z-level depth test objects ────────────────────────────────── -->
     <div
-      v-for="a in ABYSS"
-      :key="a.label"
-      class="abyss-marker"
-      :style="abyssStyle(a.waypointIndex)"
+      v-for="(obj, i) in DEPTH_OBJECTS" :key="i"
+      class="depth-obj"
+      :style="{
+        left:   `${obj.x}px`,
+        top:    `${obj.y}px`,
+        background: obj.color,
+        transform: `translate(-50%, -50%) scale(${obj.scale})`,
+        filter: `blur(${obj.blur})`,
+        zIndex: obj.z + 3,
+      }"
     >
-      {{ a.label }}
+      {{ obj.label }}
     </div>
 
-    <!-- Path spine -->
-    <svg class="path-spine" viewBox="0 0 4000 14000" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
-      <path
-        :d="svgPath"
-        fill="none"
-        stroke="rgba(201,149,108,0.25)"
-        stroke-width="3"
-        stroke-dasharray="16 10"
-      />
-      <circle v-for="(wp, i) in WAYPOINTS" :key="i"
-        :cx="wp.x" :cy="wp.y" r="10"
+    <!-- ── Path spine SVG ─────────────────────────────────────────────── -->
+    <svg class="path-spine" viewBox="0 0 4000 14000" preserveAspectRatio="none">
+      <!-- Before fork -->
+      <path :d="mainBeforeSvg" fill="none" stroke="rgba(201,149,108,0.2)" stroke-width="3" stroke-dasharray="16 10" />
+      <!-- After merge -->
+      <path :d="mainAfterSvg"  fill="none" stroke="rgba(201,149,108,0.2)" stroke-width="3" stroke-dasharray="16 10" />
+      <!-- Waypoint dots -->
+      <circle v-for="(wp, i) in [...MAIN_BEFORE, ...MAIN_AFTER]" :key="i"
+        :cx="wp.x" :cy="wp.y" r="8"
         :fill="i % 2 === 0 ? '#c9956c' : '#a855f7'"
-        opacity="0.5"
+        opacity="0.4"
       />
     </svg>
 
@@ -113,8 +107,6 @@ const svgPath = buildSvgPath(WAYPOINTS)
 <style>
 .station {
   position: absolute;
-  width: 900px;
-  height: 600px;
   border: 1px solid var(--col-gold);
   border-radius: 4px;
   display: flex;
@@ -138,20 +130,25 @@ const svgPath = buildSvgPath(WAYPOINTS)
   color: rgba(201, 149, 108, 0.4);
 }
 
-.abyss-marker {
+/* Depth test blobs */
+.depth-obj {
   position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: ui-monospace, monospace;
-  font-size: 10px;
-  letter-spacing: 0.15em;
-  color: var(--col-glow);
-  opacity: 0.5;
-  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.7);
+  pointer-events: none;
 }
 
 .path-spine {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 0; left: 0;
   width: 4000px;
   height: 14000px;
   pointer-events: none;

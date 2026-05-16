@@ -1,13 +1,38 @@
 <script setup lang="ts">
+import { watch } from 'vue'
 import { useScrollEngine } from '../composables/useScrollEngine'
-import { useWorldCamera } from '../composables/useWorldCamera'
+import { useWorldCamera, cursorNudgeX, cursorNudgeY, cursorWorldX, cursorWorldY, cameraOverridePos, evalSpline } from '../composables/useWorldCamera'
+import { useCursor } from '../composables/useCursor'
 import { useDwell } from '../composables/useDwell'
 import DwellIndicator from './DwellIndicator.vue'
 
 const { pathProgress, smoothScrollY } = useScrollEngine()
 const { cameraX, cameraY, rotation, worldTransform } = useWorldCamera(pathProgress)
+const { cursorSx, cursorSy, cursorVx, cursorVy, NUDGE_STRENGTH } = useCursor()
 
 useDwell(cameraX, cameraY)
+
+// Drive cursor nudge into world transform
+watch([cursorSx, cursorSy], ([sx, sy]) => {
+  cursorNudgeX.value = sx * NUDGE_STRENGTH
+  cursorNudgeY.value = sy * NUDGE_STRENGTH
+})
+
+// Convert viewport cursor position to world-space position
+// so useDwell can detect proximity to objects regardless of camera position
+watch([cursorVx, cursorVy], ([vx, vy]) => {
+  // Camera position in world space
+  const cx = cameraOverridePos.value?.x ?? evalSpline(pathProgress.value).x
+  const cy = cameraOverridePos.value?.y ?? evalSpline(pathProgress.value).y
+  // Viewport cursor offset from center (in screen px), un-rotated into world space
+  const dx = vx - window.innerWidth  / 2
+  const dy = vy - window.innerHeight / 2
+  const rad = -rotation.value * Math.PI / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  cursorWorldX.value = cx + (dx * cos - dy * sin)
+  cursorWorldY.value = cy + (dx * sin + dy * cos)
+})
 </script>
 
 <template>
@@ -27,6 +52,7 @@ useDwell(cameraX, cameraY)
     <div>cam X <span>{{ cameraX.toFixed(0) }}</span></div>
     <div>cam Y <span>{{ cameraY.toFixed(0) }}</span></div>
     <div>rotation <span>{{ rotation.toFixed(2) }}°</span></div>
+    <div>cursor world <span>{{ cursorWorldX.toFixed(0) }}, {{ cursorWorldY.toFixed(0) }}</span></div>
   </div>
 </template>
 

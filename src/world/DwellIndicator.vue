@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { dwellTarget, dwellProgress, dwellActive } from '../composables/useDwell'
-import { spurJunction } from '../composables/useWorldCamera'
 
-const R    = 22
+const R    = 28
 const CIRC = 2 * Math.PI * R
 
 const strokeDash = computed(() => {
@@ -11,56 +10,39 @@ const strokeDash = computed(() => {
   return `${filled} ${CIRC - filled}`
 })
 
-const junctionX = computed(() => dwellTarget.value ? spurJunction(dwellTarget.value).x : 0)
-const junctionY = computed(() => dwellTarget.value ? spurJunction(dwellTarget.value).y : 0)
-const color      = computed(() => dwellTarget.value?.color ?? 'white')
+// Ring draws at the object, not the junction — that's where the cursor is
+const ox    = computed(() => dwellTarget.value?.object.x ?? 0)
+const oy    = computed(() => dwellTarget.value?.object.y ?? 0)
+const color = computed(() => dwellTarget.value?.color.replace('0.18', '0.8') ?? 'white')
 </script>
 
 <template>
   <svg
-    v-if="dwellTarget && !dwellActive"
+    v-if="dwellTarget || dwellActive"
     class="dwell-svg"
     viewBox="0 0 4000 14000"
     preserveAspectRatio="none"
   >
     <!-- Background ring -->
     <circle
-      :cx="junctionX" :cy="junctionY" :r="R"
+      :cx="ox" :cy="oy" :r="R"
       fill="none"
-      stroke="rgba(255,255,255,0.1)"
+      stroke="rgba(255,255,255,0.08)"
       stroke-width="3"
     />
     <!-- Countdown arc -->
     <circle
-      :cx="junctionX" :cy="junctionY" :r="R"
+      :cx="ox" :cy="oy" :r="R"
       fill="none"
       :stroke="color"
       stroke-width="3"
       stroke-linecap="round"
       :stroke-dasharray="strokeDash"
       stroke-dashoffset="0"
-      transform-origin="center"
-      style="transform: rotate(-90deg); transition: stroke-dasharray 0.05s linear;"
+      :style="{ transformOrigin: `${ox}px ${oy}px`, transform: 'rotate(-90deg)' }"
     />
     <!-- Center dot -->
-    <circle :cx="junctionX" :cy="junctionY" r="4" :fill="color" opacity="0.8" />
-  </svg>
-
-  <!-- Locked indicator while on excursion -->
-  <svg
-    v-if="dwellActive"
-    class="dwell-svg"
-    viewBox="0 0 4000 14000"
-    preserveAspectRatio="none"
-  >
-    <circle
-      :cx="junctionX" :cy="junctionY" :r="R"
-      fill="none"
-      :stroke="color"
-      stroke-width="2"
-      opacity="0.5"
-      stroke-dasharray="4 4"
-    />
+    <circle :cx="ox" :cy="oy" r="5" :fill="color" opacity="0.6" />
   </svg>
 </template>
 

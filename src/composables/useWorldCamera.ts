@@ -76,34 +76,75 @@ export function buildSvgPath(): string {
   return d
 }
 
-// ── Spurs ─────────────────────────────────────────────────────────────────────
-// junctionProgress maps to an exact spine point via evalSpline().
-// This guarantees the spur visually starts on the curve, not beside it.
+// ── Spurs (Sankey / river style) ──────────────────────────────────────────────
+// Each spur is a filled ribbon that fans out from the spine to embrace an object.
+// The ribbon has two edges — left and right — that start pinched at the junction
+// and open to a pool around the object.
 export interface Spur {
   label:            string
-  junctionProgress: number
-  object:           { x: number; y: number }
+  junctionProgress: number            // where on the spine the ribbon departs
+  object:           { x: number; y: number }  // center of the pool
   color:            string
+  width:            number            // half-width of ribbon at the object end (px)
 }
 
-// Abyss3 waypoint = index 5 of 10 segments → progress 0.5.
-// Four spurs spaced around that point, alternating left/right.
 export const ABYSS3_SPURS: Spur[] = [
-  { label: 'z-2', junctionProgress: 0.46, object: { x: 600,  y: 6600 }, color: 'rgba(45,212,191,0.5)'  },
-  { label: 'z-1', junctionProgress: 0.48, object: { x: 1900, y: 6800 }, color: 'rgba(251,113,133,0.5)' },
-  { label: 'z+1', junctionProgress: 0.52, object: { x: 600,  y: 7200 }, color: 'rgba(110,231,183,0.6)' },
-  { label: 'z+2', junctionProgress: 0.54, object: { x: 1900, y: 7400 }, color: 'rgba(253,230,138,0.6)' },
+  { label: 'z-2', junctionProgress: 0.46, object: { x: 620,  y: 6620 }, color: 'rgba(45,212,191,0.18)',  width: 90  },
+  { label: 'z-1', junctionProgress: 0.48, object: { x: 1880, y: 6820 }, color: 'rgba(251,113,133,0.18)', width: 80  },
+  { label: 'z+1', junctionProgress: 0.52, object: { x: 620,  y: 7180 }, color: 'rgba(110,231,183,0.18)', width: 75  },
+  { label: 'z+2', junctionProgress: 0.54, object: { x: 1880, y: 7380 }, color: 'rgba(253,230,138,0.18)', width: 70  },
 ]
 
 export function spurJunction(s: Spur): { x: number; y: number } {
   return evalSpline(s.junctionProgress)
 }
 
-export function spurSvgPath(s: Spur): string {
+// Sankey ribbon as a filled SVG shape.
+// At the junction: pinched to a point on the spine.
+// At the object: opens into an ellipse (approximated as two bezier curves).
+export function spurRibbonPath(s: Spur): string {
+  const j  = spurJunction(s)
+  const ox = s.object.x
+  const oy = s.object.y
+  const w  = s.width
+
+  // Direction from junction to object — perpendicular gives ribbon width
+  const dx = ox - j.x
+  const dy = oy - j.y
+  const len = Math.sqrt(dx * dx + dy * dy) || 1
+  const px = -dy / len   // perpendicular x
+  const py =  dx / len   // perpendicular y
+
+  // Object pool: left and right edge points
+  const lx = ox + px * w
+  const ly = oy + py * w
+  const rx = ox - px * w
+  const ry = oy - py * w
+
+  // Control points for the bezier sides — bow outward from center
+  const mid = 0.55
+  const clx = j.x + (lx - j.x) * mid + px * w * 0.4
+  const cly = j.y + (ly - j.y) * mid + py * w * 0.4
+  const crx = j.x + (rx - j.x) * mid - px * w * 0.4
+  const cry = j.y + (ry - j.y) * mid - py * w * 0.4
+
+  const f = (n: number) => n.toFixed(1)
+
+  return [
+    `M ${f(j.x)} ${f(j.y)}`,
+    `Q ${f(clx)} ${f(cly)} ${f(lx)} ${f(ly)}`,          // left edge
+    `A ${f(w)} ${f(w)} 0 0 1 ${f(rx)} ${f(ry)}`,        // arc across the pool
+    `Q ${f(crx)} ${f(cry)} ${f(j.x)} ${f(j.y)}`,        // right edge back
+    'Z',
+  ].join(' ')
+}
+
+// Stroke centerline (for the dashed guide inside the ribbon)
+export function spurCenterPath(s: Spur): string {
   const j  = spurJunction(s)
   const mx = (j.x + s.object.x) / 2
   const my = (j.y + s.object.y) / 2
-  return `M ${j.x.toFixed(1)} ${j.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${s.object.x} ${s.object.y}`
+  return `M ${j.x.toFixed(1)} ${j.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${s.object.x.toFixed(1)} ${s.object.y.toFixed(1)}`
 }
 
 export function spurObjectAngle(s: Spur): number {
@@ -112,6 +153,10 @@ export function spurObjectAngle(s: Spur): number {
   const dy = s.object.y - j.y
   return Math.atan2(dx, dy) * (180 / Math.PI)
 }
+
+// Cursor world position — used by useDwell to detect hover over objects
+export const cursorWorldX = ref(0)
+export const cursorWorldY = ref(0)
 
 // ── Camera override ───────────────────────────────────────────────────────────
 // useDwell writes here to move the camera off-spine to an object.
@@ -136,9 +181,18 @@ export function useWorldCamera(pathProgress: Ref<number>) {
     return Math.atan2(dx, dy) * (180 / Math.PI)
   })
 
-  const worldTransform = computed(() =>
-    `translate(50vw, 50vh) rotate(${rotation.value}deg) translate(${-cameraX.value}px, ${-cameraY.value}px)`
-  )
+  // cursorNudge is injected by WorldContainer after useCursor() is available.
+  // Default: no nudge. Using a module-level ref so it survives across composable calls.
+  const worldTransform = computed(() => {
+    const nx = cursorNudgeX.value
+    const ny = cursorNudgeY.value
+    // Nudge is applied BEFORE the camera translation — shifts the world in screen space
+    return `translate(50vw, 50vh) translate(${-nx}px, ${-ny}px) rotate(${rotation.value}deg) translate(${-cameraX.value}px, ${-cameraY.value}px)`
+  })
 
   return { cameraX, cameraY, rotation, worldTransform }
 }
+
+// Written by WorldContainer from cursorSx/Sy
+export const cursorNudgeX = ref(0)
+export const cursorNudgeY = ref(0)

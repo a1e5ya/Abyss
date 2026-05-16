@@ -4,7 +4,7 @@ import WorldContainer from './world/WorldContainer.vue'
 import {
   WAYPOINTS, ABYSS3_SPURS,
   getTangentAngle, buildSvgPath, progressOf,
-  spurSvgPath, spurObjectAngle, spurJunction,
+  spurRibbonPath, spurCenterPath, spurObjectAngle, spurJunction,
 } from './composables/useWorldCamera'
 import { useViewport } from './composables/useViewport'
 
@@ -128,25 +128,33 @@ const svgPath = buildSvgPath()
       :style="abyss3ObjStyle(obj)"
     >{{ obj.zText }}</div>
 
-    <!-- Path spine + spurs -->
+    <!-- Path spine + Sankey ribbons -->
     <svg class="path-spine" viewBox="0 0 4000 14000" preserveAspectRatio="none">
-      <!-- Main spine -->
-      <path :d="svgPath" fill="none" stroke="rgba(201,149,108,0.2)" stroke-width="3" stroke-dasharray="16 10" />
-
-      <!-- Abyss 3 spurs -->
+      <!-- Sankey ribbons (filled, behind spine) -->
       <path
-        v-for="spur in ABYSS3_SPURS" :key="spur.label"
-        :d="spurSvgPath(spur)"
-        fill="none"
-        :stroke="spur.color"
-        stroke-width="1.5"
-        stroke-dasharray="6 5"
+        v-for="spur in ABYSS3_SPURS" :key="'r-'+spur.label"
+        :d="spurRibbonPath(spur)"
+        :fill="spur.color"
+        stroke="none"
       />
-      <!-- Spur junction dots — computed from spine, guaranteed on-curve -->
+      <!-- Center guide (subtle dashed) -->
+      <path
+        v-for="spur in ABYSS3_SPURS" :key="'c-'+spur.label"
+        :d="spurCenterPath(spur)"
+        fill="none"
+        :stroke="spur.color.replace('0.18', '0.4')"
+        stroke-width="1"
+        stroke-dasharray="4 4"
+      />
+
+      <!-- Main spine on top -->
+      <path :d="svgPath" fill="none" stroke="rgba(201,149,108,0.25)" stroke-width="3" stroke-dasharray="16 10" />
+
+      <!-- Junction dots on spine -->
       <circle
         v-for="spur in ABYSS3_SPURS" :key="'j-'+spur.label"
         :cx="spurJunction(spur).x" :cy="spurJunction(spur).y"
-        r="4" :fill="spur.color"
+        r="4" :fill="spur.color.replace('0.18', '0.7')"
       />
 
       <!-- Spine waypoint dots -->

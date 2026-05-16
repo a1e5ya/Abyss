@@ -4,10 +4,8 @@ import { cursorVy } from './useCursor'
 const WORLD_HEIGHT   = 14000
 const LERP_DEFAULT   = 0.075
 const LERP_ABYSS3    = 0.03
-// Progress range where mouse takes control of navigation
 const ABYSS3_START   = 0.42
 const ABYSS3_END     = 0.58
-// Fraction of viewport height at top/bottom that re-enables scroll to exit
 const EXIT_BAND      = 0.20
 
 const scrollY       = ref(0)
@@ -21,6 +19,17 @@ let scrollContainer: HTMLElement | null = null
 let instanceCount   = 0
 let lastScrollY     = -1
 
+// Hard-sync scroll position to a world-Y value with no lerp debt.
+// Call this before releasing cameraOverridePos so the spine position
+// matches exactly where the camera just was.
+export function teleportScrollTo(worldY: number) {
+  const clamped = Math.max(0, Math.min(WORLD_HEIGHT, worldY))
+  smoothScrollY.value = clamped
+  scrollY.value       = clamped
+  lastScrollY         = clamped
+  if (scrollContainer) scrollContainer.scrollTop = clamped
+}
+
 function inAbyss3() {
   const p = smoothScrollY.value / WORLD_HEIGHT
   return p >= ABYSS3_START && p <= ABYSS3_END
@@ -29,14 +38,14 @@ function inAbyss3() {
 function cursorAtEdge(deltaY: number): boolean {
   const vy = cursorVy.value
   const h  = window.innerHeight
-  if (deltaY < 0) return vy < h * EXIT_BAND          // scrolling up — cursor near top
-  if (deltaY > 0) return vy > h * (1 - EXIT_BAND)    // scrolling down — cursor near bottom
+  if (deltaY < 0) return vy < h * EXIT_BAND
+  if (deltaY > 0) return vy > h * (1 - EXIT_BAND)
   return false
 }
 
 function onWheel(e: WheelEvent) {
   if (inAbyss3() && !cursorAtEdge(e.deltaY)) {
-    e.preventDefault()   // eat the scroll — mouse controls here
+    e.preventDefault()
   }
 }
 
@@ -64,7 +73,6 @@ export function useScrollEngine() {
     if (instanceCount === 0) {
       scrollContainer = document.getElementById('scroll-driver')
       scrollContainer?.addEventListener('scroll', onScroll, { passive: true })
-      // wheel must be non-passive so we can preventDefault in the zone
       scrollContainer?.addEventListener('wheel', onWheel, { passive: false })
       rafId = requestAnimationFrame(tick)
     }

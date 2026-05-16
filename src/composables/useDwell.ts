@@ -2,6 +2,7 @@ import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import gsap from 'gsap'
 import { ABYSS3_SPURS, spurJunction, cameraOverridePos, cursorWorldX, cursorWorldY } from './useWorldCamera'
+import { teleportScrollTo } from './useScrollEngine'
 import type { Spur } from './useWorldCamera'
 
 const DWELL_RADIUS   = 400   // px along ribbon centerline — wide approach zone
@@ -21,6 +22,11 @@ let moveTween:      gsap.core.Tween | null = null
 let returning = false
 
 function finishReturn() {
+  // Sync scroll to the junction's world-Y before releasing override,
+  // so evalSpline(pathProgress) == cameraOverridePos exactly at handoff.
+  if (dwellTarget.value) {
+    teleportScrollTo(spurJunction(dwellTarget.value).y)
+  }
   cameraOverridePos.value = null
   dwellActive.value       = false
   dwellTarget.value       = null

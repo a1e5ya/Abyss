@@ -1,7 +1,10 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 
-const WORLD_HEIGHT = 14000
-const LERP_FACTOR  = 0.075
+const WORLD_HEIGHT   = 14000
+const LERP_DEFAULT   = 0.075
+const LERP_ABYSS3    = 0.03   // softer scroll feel through the Sankey section
+const ABYSS3_START   = 0.42   // progress range that gets the soft lerp
+const ABYSS3_END     = 0.58
 
 const scrollY       = ref(0)
 const smoothScrollY = ref(0)
@@ -27,7 +30,9 @@ function onScroll() {
 }
 
 function tick() {
-  smoothScrollY.value += (scrollY.value - smoothScrollY.value) * LERP_FACTOR
+  const p = smoothScrollY.value / WORLD_HEIGHT
+  const lerp = (p >= ABYSS3_START && p <= ABYSS3_END) ? LERP_ABYSS3 : LERP_DEFAULT
+  smoothScrollY.value += (scrollY.value - smoothScrollY.value) * lerp
   pathProgress.value = Math.min(smoothScrollY.value / WORLD_HEIGHT, 1)
   rafId = requestAnimationFrame(tick)
 }

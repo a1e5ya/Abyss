@@ -3,7 +3,7 @@ import { cursorVy } from './useCursor'
 
 const WORLD_HEIGHT   = 14000
 const LERP_DEFAULT   = 0.075
-const LERP_ABYSS3    = 0.03
+const LERP_ABYSS3    = 0.025
 const ABYSS3_START   = 0.42
 const ABYSS3_END     = 0.58
 const EXIT_BAND      = 0.20
@@ -12,6 +12,10 @@ const scrollY       = ref(0)
 const smoothScrollY = ref(0)
 const pathProgress  = ref(0)
 
+// When set, tick() treats this as the scroll target for one handoff frame,
+// then clears it. Lets finishReturn() align the spine without touching scrollTop.
+let snapScrollY: number | null = null
+
 export const overrideProgress = ref<number | null>(null)
 
 let rafId: number
@@ -19,15 +23,10 @@ let scrollContainer: HTMLElement | null = null
 let instanceCount   = 0
 let lastScrollY     = -1
 
-// Hard-sync scroll position to a world-Y value with no lerp debt.
-// Call this before releasing cameraOverridePos so the spine position
-// matches exactly where the camera just was.
-export function teleportScrollTo(worldY: number) {
-  const clamped = Math.max(0, Math.min(WORLD_HEIGHT, worldY))
-  smoothScrollY.value = clamped
-  scrollY.value       = clamped
-  lastScrollY         = clamped
-  if (scrollContainer) scrollContainer.scrollTop = clamped
+// Called by useDwell.finishReturn() to align spine position with where
+// the return tween landed, without touching scrollTop (which fires onScroll).
+export function alignScrollToY(worldY: number) {
+  snapScrollY = Math.max(0, Math.min(WORLD_HEIGHT, worldY))
 }
 
 function inAbyss3() {
@@ -61,6 +60,19 @@ function onScroll() {
 }
 
 function tick() {
+  // If finishReturn requested a scroll alignment, apply it now in the RAF
+  // without touching scrollTop (avoids firing onScroll → onScrollWhileExcursing)
+  if (snapScrollY !== null) {
+    scrollY.value       = snapScrollY
+    smoothScrollY.value = snapScrollY
+    if (scrollContainer) {
+      // Suppress the resulting scroll event by pre-setting lastScrollY
+      lastScrollY = snapScrollY
+      scrollContainer.scrollTop = snapScrollY
+    }
+    snapScrollY = null
+  }
+
   const p = smoothScrollY.value / WORLD_HEIGHT
   const lerp = (p >= ABYSS3_START && p <= ABYSS3_END) ? LERP_ABYSS3 : LERP_DEFAULT
   smoothScrollY.value += (scrollY.value - smoothScrollY.value) * lerp

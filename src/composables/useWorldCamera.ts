@@ -70,6 +70,15 @@ function getTangent(progress: number): { dx: number; dy: number } {
   }
 }
 
+// Returns the tangent angle (degrees) at any progress value.
+// Used by stations to counter-rotate themselves to sit flat on the path.
+export function getTangentAngle(progress: number): number {
+  const { dx, dy } = getTangent(progress)
+  return Math.atan2(dx, dy) * (180 / Math.PI)
+}
+
+export { WAYPOINTS }
+
 export function useWorldCamera(pathProgress: Ref<number>) {
   const cameraX = computed(() => getPoint(pathProgress.value).x)
   const cameraY = computed(() => getPoint(pathProgress.value).y)

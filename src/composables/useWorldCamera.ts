@@ -1,33 +1,75 @@
 import { computed } from 'vue'
 import type { Ref } from 'vue'
 
-// Each waypoint has a label for identification.
-// The camera visits every waypoint in order.
+// ── Main spine ────────────────────────────────────────────────────────────────
+// One clean path through the world. Camera always follows this.
 export const WAYPOINTS = [
-  { x: 2000, y: 0,     label: 'hero' },
-  { x: 1200, y: 1400,  label: 'abyss1' },
+  { x: 2000, y: 0,     label: 'hero'     },
+  { x: 1200, y: 1400,  label: 'abyss1'   },
   { x: 2000, y: 2800,  label: 'portrait' },
-  { x: 2800, y: 4200,  label: 'abyss2' },
-  { x: 2000, y: 5600,  label: 'product' },
-  // Abyss 3 — main spine passes through x=1200, y=7000.
-  // Four detours peel off the spine, visit an object, return.
-  // Each detour: [exit point on spine] → [object] → [return to spine]
-  { x: 1350, y: 6500,  label: 'abyss3-entry' },   // approaching abyss 3
-  { x: 900,  y: 6750,  label: 'abyss3-z-2' },     // z−2 deep blob
-  { x: 1200, y: 6900,  label: 'abyss3-r1' },      // return to spine
-  { x: 1400, y: 7100,  label: 'abyss3-z-1' },     // z−1 mid blob
-  { x: 1200, y: 7200,  label: 'abyss3-r2' },      // return to spine
-  { x: 1100, y: 7400,  label: 'abyss3-z+1' },     // z+1 fore blob
-  { x: 1200, y: 7550,  label: 'abyss3-r3' },      // return to spine
-  { x: 1500, y: 7700,  label: 'abyss3-z+2' },     // z+2 sphere blob
-  { x: 1200, y: 7900,  label: 'abyss3-exit' },    // exit abyss 3
-  { x: 2000, y: 8400,  label: 'web' },
-  { x: 2800, y: 9800,  label: 'abyss4' },
-  { x: 2000, y: 11200, label: '3d' },
-  { x: 1200, y: 12600, label: 'abyss5' },
+  { x: 2800, y: 4200,  label: 'abyss2'   },
+  { x: 2000, y: 5600,  label: 'product'  },
+  { x: 1200, y: 7000,  label: 'abyss3'   },
+  { x: 2000, y: 8400,  label: 'web'      },
+  { x: 2800, y: 9800,  label: 'abyss4'   },
+  { x: 2000, y: 11200, label: '3d'       },
+  { x: 1200, y: 12600, label: 'abyss5'   },
   { x: 2000, y: 14000, label: 'contacts' },
 ]
 
+// ── Spurs ─────────────────────────────────────────────────────────────────────
+// Each spur is a short sub-path that leaves the spine at a junction point,
+// reaches an object, and is a dead-end (camera doesn't follow it automatically).
+// They are purely geometric — used for SVG drawing and object placement.
+export interface Spur {
+  label: string
+  junction: { x: number; y: number }  // where spur departs the spine
+  object:   { x: number; y: number }  // where the object sits
+  color: string
+}
+
+export const ABYSS3_SPURS: Spur[] = [
+  {
+    label:    'z-2',
+    junction: { x: 1350, y: 6600 },
+    object:   { x: 700,  y: 6700 },
+    color:    'rgba(45,212,191,0.5)',
+  },
+  {
+    label:    'z-1',
+    junction: { x: 1050, y: 6850 },
+    object:   { x: 550,  y: 7050 },
+    color:    'rgba(251,113,133,0.5)',
+  },
+  {
+    label:    'z+1',
+    junction: { x: 1300, y: 7150 },
+    object:   { x: 2800, y: 7050 },
+    color:    'rgba(110,231,183,0.6)',
+  },
+  {
+    label:    'z+2',
+    junction: { x: 1050, y: 7350 },
+    object:   { x: 2900, y: 7400 },
+    color:    'rgba(253,230,138,0.6)',
+  },
+]
+
+// Spur path as SVG string — straight line from junction to object
+export function spurSvgPath(s: Spur): string {
+  const mx = (s.junction.x + s.object.x) / 2
+  const my = (s.junction.y + s.object.y) / 2 - 60
+  return `M ${s.junction.x} ${s.junction.y} Q ${mx} ${my} ${s.object.x} ${s.object.y}`
+}
+
+// Tangent angle at the object end of a spur (for counter-rotating the object)
+export function spurObjectAngle(s: Spur): number {
+  const dx = s.object.x - s.junction.x
+  const dy = s.object.y - s.junction.y
+  return Math.atan2(dx, dy) * (180 / Math.PI)
+}
+
+// ── Catmull-Rom spine math ────────────────────────────────────────────────────
 function cr(p0: number, p1: number, p2: number, p3: number, t: number): number {
   return 0.5 * (
     2 * p1 +
@@ -60,7 +102,6 @@ function evalTangent(progress: number) {
   return { dx: b.x - a.x, dy: b.y - a.y }
 }
 
-// Progress value for a named waypoint
 export function progressOf(label: string): number {
   const i = WAYPOINTS.findIndex(w => w.label === label)
   if (i < 0) return 0

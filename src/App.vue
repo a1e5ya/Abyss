@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import WorldContainer from './world/WorldContainer.vue'
-import { WAYPOINTS, getTangentAngle, buildSvgPath, progressOf } from './composables/useWorldCamera'
+import {
+  WAYPOINTS, ABYSS3_SPURS,
+  getTangentAngle, buildSvgPath, progressOf,
+  spurSvgPath, spurObjectAngle,
+} from './composables/useWorldCamera'
 import { useViewport } from './composables/useViewport'
 
 const { vw, vh } = useViewport()
@@ -18,27 +22,28 @@ const STATIONS = [
   { label: 'CONTACTS',         wpLabel: 'contacts' },
 ]
 
-const ABYSS_LABELS = ['abyss1', 'abyss2', 'abyss3-entry', 'abyss4', 'abyss5']
+const ABYSS_LABELS = ['abyss1', 'abyss2', 'abyss3', 'abyss4', 'abyss5']
 
-// Depth objects — each sits at its named waypoint on the path
-const DEPTH_OBJECTS = [
-  // Abyss 1
-  { wpLabel: 'abyss1',      z: -2, color: 'var(--atmo-teal)',  size: 110, blur: 'var(--blur-deep)', scale: 0.6, zText: 'z −2' },
-  // Abyss 3 detour objects — camera visits each one
-  { wpLabel: 'abyss3-z-2',  z: -2, color: 'var(--atmo-sage)',  size: 110, blur: 'var(--blur-deep)', scale: 0.6, zText: 'z −2' },
-  { wpLabel: 'abyss3-z-1',  z: -1, color: 'var(--atmo-coral)', size: 90,  blur: 'var(--blur-mid)',  scale: 0.8, zText: 'z −1' },
-  { wpLabel: 'abyss3-z+1',  z:  1, color: 'var(--iris-mint)',  size: 80,  blur: '0px',              scale: 1.1, zText: 'z +1' },
-  { wpLabel: 'abyss3-z+2',  z:  2, color: 'var(--iris-gold)',  size: 70,  blur: '0px',              scale: 1.3, zText: 'z +2' },
+// Abyss 1 — 4 depth objects scattered near the abyss1 waypoint (x=1200, y=1400)
+const ABYSS1_OBJECTS = [
+  { x: 800,  y: 1100, z: -2, color: 'var(--atmo-teal)',  size: 110, blur: 'var(--blur-deep)', scale: 0.6, zText: 'z −2' },
+  { x: 1000, y: 1350, z: -1, color: 'var(--atmo-rose)',  size: 90,  blur: 'var(--blur-mid)',  scale: 0.8, zText: 'z −1' },
+  { x: 1600, y: 1500, z:  1, color: 'var(--col-glow)',   size: 80,  blur: '0px',              scale: 1.1, zText: 'z +1' },
+  { x: 1700, y: 1200, z:  2, color: 'var(--col-gold)',   size: 70,  blur: '0px',              scale: 1.3, zText: 'z +2' },
 ]
 
-function wpByLabel(label: string) {
-  return WAYPOINTS.find(w => w.label === label)!
-}
+// Abyss 3 — objects sit at the end of their spurs
+const ABYSS3_OBJECTS = [
+  { spur: ABYSS3_SPURS[0], z: -2, color: 'var(--atmo-sage)',  size: 110, blur: 'var(--blur-deep)', scale: 0.6, zText: 'z −2' },
+  { spur: ABYSS3_SPURS[1], z: -1, color: 'var(--atmo-coral)', size: 90,  blur: 'var(--blur-mid)',  scale: 0.8, zText: 'z −1' },
+  { spur: ABYSS3_SPURS[2], z:  1, color: 'var(--iris-mint)',  size: 80,  blur: '0px',              scale: 1.1, zText: 'z +1' },
+  { spur: ABYSS3_SPURS[3], z:  2, color: 'var(--iris-gold)',  size: 70,  blur: '0px',              scale: 1.3, zText: 'z +2' },
+]
 
 function stationStyle(wpLabel: string) {
   const progress = progressOf(wpLabel)
   const angle = getTangentAngle(progress)
-  const wp = wpByLabel(wpLabel)
+  const wp = WAYPOINTS.find(w => w.label === wpLabel)!
   return {
     left:      `${wp.x}px`,
     top:       `${wp.y}px`,
@@ -51,7 +56,7 @@ function stationStyle(wpLabel: string) {
 function abyssStyle(wpLabel: string) {
   const progress = progressOf(wpLabel)
   const angle = getTangentAngle(progress)
-  const wp = wpByLabel(wpLabel)
+  const wp = WAYPOINTS.find(w => w.label === wpLabel)!
   return {
     left:      `${wp.x}px`,
     top:       `${wp.y}px`,
@@ -59,13 +64,24 @@ function abyssStyle(wpLabel: string) {
   }
 }
 
-function depthStyle(obj: typeof DEPTH_OBJECTS[0]) {
-  const progress = progressOf(obj.wpLabel)
-  const angle = getTangentAngle(progress)
-  const wp = wpByLabel(obj.wpLabel)
+function abyss1ObjStyle(obj: typeof ABYSS1_OBJECTS[0]) {
   return {
-    left:       `${wp.x}px`,
-    top:        `${wp.y}px`,
+    left:       `${obj.x}px`,
+    top:        `${obj.y}px`,
+    width:      `${obj.size}px`,
+    height:     `${obj.size}px`,
+    background: obj.color,
+    filter:     `blur(${obj.blur})`,
+    transform:  `translate(-50%, -50%) scale(${obj.scale})`,
+    zIndex:     String(obj.z + 3),
+  }
+}
+
+function abyss3ObjStyle(obj: typeof ABYSS3_OBJECTS[0]) {
+  const angle = spurObjectAngle(obj.spur)
+  return {
+    left:       `${obj.spur.object.x}px`,
+    top:        `${obj.spur.object.y}px`,
     width:      `${obj.size}px`,
     height:     `${obj.size}px`,
     background: obj.color,
@@ -81,6 +97,7 @@ const svgPath = buildSvgPath()
 <template>
   <WorldContainer>
 
+    <!-- Stations -->
     <div
       v-for="s in STATIONS" :key="s.label"
       class="station"
@@ -90,26 +107,53 @@ const svgPath = buildSvgPath()
       <small>{{ stationW }} × {{ stationH }}</small>
     </div>
 
+    <!-- Abyss labels -->
     <div
       v-for="label in ABYSS_LABELS" :key="label"
       class="abyss-marker"
       :style="abyssStyle(label)"
-    >
-      {{ label.replace('-entry', '') }}
-    </div>
+    >{{ label }}</div>
 
+    <!-- Abyss 1 depth objects -->
     <div
-      v-for="obj in DEPTH_OBJECTS" :key="obj.wpLabel"
+      v-for="obj in ABYSS1_OBJECTS" :key="'a1-'+obj.zText"
       class="depth-obj"
-      :style="depthStyle(obj)"
+      :style="abyss1ObjStyle(obj)"
     >{{ obj.zText }}</div>
 
+    <!-- Abyss 3 spur objects -->
+    <div
+      v-for="obj in ABYSS3_OBJECTS" :key="'a3-'+obj.zText"
+      class="depth-obj"
+      :style="abyss3ObjStyle(obj)"
+    >{{ obj.zText }}</div>
+
+    <!-- Path spine + spurs -->
     <svg class="path-spine" viewBox="0 0 4000 14000" preserveAspectRatio="none">
+      <!-- Main spine -->
       <path :d="svgPath" fill="none" stroke="rgba(201,149,108,0.2)" stroke-width="3" stroke-dasharray="16 10" />
+
+      <!-- Abyss 3 spurs -->
+      <path
+        v-for="spur in ABYSS3_SPURS" :key="spur.label"
+        :d="spurSvgPath(spur)"
+        fill="none"
+        :stroke="spur.color"
+        stroke-width="1.5"
+        stroke-dasharray="6 5"
+      />
+      <!-- Spur junction dots -->
+      <circle
+        v-for="spur in ABYSS3_SPURS" :key="'j-'+spur.label"
+        :cx="spur.junction.x" :cy="spur.junction.y"
+        r="4" :fill="spur.color"
+      />
+
+      <!-- Spine waypoint dots -->
       <circle v-for="(wp, i) in WAYPOINTS" :key="i"
-        :cx="wp.x" :cy="wp.y" r="5"
-        :fill="wp.label.startsWith('abyss3-z') ? '#6ee7b7' : (i % 2 === 0 ? '#c9956c' : '#a855f7')"
-        opacity="0.5"
+        :cx="wp.x" :cy="wp.y" r="6"
+        :fill="i % 2 === 0 ? '#c9956c' : '#a855f7'"
+        opacity="0.4"
       />
     </svg>
 
@@ -128,20 +172,17 @@ const svgPath = buildSvgPath()
   gap: 8px;
   background: rgba(201, 149, 108, 0.04);
 }
-
 .station span {
   font-family: ui-monospace, monospace;
   font-size: 13px;
   letter-spacing: 0.2em;
   color: var(--col-gold);
 }
-
 .station small {
   font-family: ui-monospace, monospace;
   font-size: 10px;
   color: rgba(201, 149, 108, 0.3);
 }
-
 .abyss-marker {
   position: absolute;
   font-family: ui-monospace, monospace;
@@ -151,7 +192,6 @@ const svgPath = buildSvgPath()
   opacity: 0.45;
   text-transform: uppercase;
 }
-
 .depth-obj {
   position: absolute;
   border-radius: 50%;
@@ -163,7 +203,6 @@ const svgPath = buildSvgPath()
   color: rgba(255,255,255,0.6);
   pointer-events: none;
 }
-
 .path-spine {
   position: absolute;
   top: 0; left: 0;

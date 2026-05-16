@@ -111,7 +111,7 @@ export function spurJunction(s: Spur): { x: number; y: number } {
   return evalSpline(s.junctionProgress)
 }
 
-const JUNCTION_WIDTH = 18  // ribbon half-width where it meets the spine (px)
+const JUNCTION_WIDTH = 40  // ribbon half-width where it meets the spine (px)
 
 // Sankey ribbon as a filled SVG shape.
 // Starts with a narrow mouth at the spine junction, fans out to a pool at the object.

@@ -136,8 +136,8 @@ const abyss3SpinePath = buildSpineSegment(0.44, 0.56)
       <path
         :d="abyss3SpinePath"
         fill="none"
-        stroke="rgba(201,149,108,0.12)"
-        stroke-width="180"
+        stroke="rgba(201,149,108,0.10)"
+        stroke-width="320"
         stroke-linecap="round"
         stroke-linejoin="round"
       />

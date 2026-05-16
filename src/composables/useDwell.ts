@@ -4,26 +4,39 @@ import gsap from 'gsap'
 import { ABYSS3_SPURS, spurJunction, cameraOverridePos, cursorWorldX, cursorWorldY } from './useWorldCamera'
 import type { Spur } from './useWorldCamera'
 
-const DWELL_RADIUS    = 300   // px — covers object pool + ribbon approach corridor
-const LEAVE_RADIUS    = 420   // px — cursor must go this far before return triggers
-const DWELL_SECONDS   = 0.5
-const TRAVEL_SECONDS  = 1.2
-const RETURN_SECONDS  = 1.8   // slow, dreamy comeback
+const DWELL_RADIUS   = 400   // px along ribbon centerline — wide approach zone
+const LEAVE_RADIUS   = 500   // px from object center before cursor triggers return
+const DWELL_SECONDS  = 0.5
+const TRAVEL_SECONDS = 1.4
+const RETURN_SECONDS = 2.2
 
 export const dwellTarget   = ref<Spur | null>(null)
 export const dwellProgress = ref(0)
 export const dwellActive   = ref(false)
 
+// State machine: idle → countdown → travelling → at-object → returning → idle
+// Only one tween in flight at a time. returning flag blocks re-entry.
 let countdownTween: gsap.core.Tween | null = null
-let travelTween:   gsap.core.Tween | null = null
+let moveTween:      gsap.core.Tween | null = null
+let returning = false
+
+function finishReturn() {
+  cameraOverridePos.value = null
+  dwellActive.value       = false
+  dwellTarget.value       = null
+  dwellProgress.value     = 0
+  returning               = false
+}
 
 function startReturn() {
-  if (!cameraOverridePos.value) return
+  if (returning || !cameraOverridePos.value) return
+  returning = true
+
   const from = { ...cameraOverridePos.value }
   const to   = dwellTarget.value ? spurJunction(dwellTarget.value) : from
 
-  travelTween?.kill()
-  travelTween = gsap.to(from, {
+  moveTween?.kill()
+  moveTween = gsap.to(from, {
     x: to.x,
     y: to.y,
     duration: RETURN_SECONDS,
@@ -31,23 +44,19 @@ function startReturn() {
     onUpdate() {
       cameraOverridePos.value = { x: from.x, y: from.y }
     },
-    onComplete() {
-      cameraOverridePos.value = null
-      dwellActive.value       = false
-      dwellTarget.value       = null
-      dwellProgress.value     = 0
-    },
+    onComplete: finishReturn,
   })
 }
 
-// Scroll engine calls this when user scrolls during an excursion
+// Called by useScrollEngine on any scroll during excursion
 export function onScrollWhileExcursing() {
-  if (!dwellActive.value || !cameraOverridePos.value) return
+  if (!dwellActive.value) return
   startReturn()
 }
 
-function cancelDwell() {
-  countdownTween?.kill(); countdownTween = null
+function cancelCountdown() {
+  countdownTween?.kill()
+  countdownTween      = null
   dwellTarget.value   = null
   dwellProgress.value = 0
 }
@@ -57,8 +66,8 @@ function excurse(spur: Spur, cameraX: Ref<number>, cameraY: Ref<number>) {
   countdownTween    = null
 
   const proxy = { x: cameraX.value, y: cameraY.value }
-  travelTween?.kill()
-  travelTween = gsap.to(proxy, {
+  moveTween?.kill()
+  moveTween = gsap.to(proxy, {
     x: spur.object.x,
     y: spur.object.y,
     duration: TRAVEL_SECONDS,
@@ -69,24 +78,18 @@ function excurse(spur: Spur, cameraX: Ref<number>, cameraY: Ref<number>) {
   })
 }
 
-// Distance from cursor world pos to a spur — checks both object center and
-// nearest point along the ribbon centerline (junction → object segment).
+// Shortest distance from point to the line segment junction→object
 function distToSpur(wx: number, wy: number, spur: Spur): number {
-  const j  = spurJunction(spur)
-  const ox = spur.object.x
-  const oy = spur.object.y
-
-  // Closest point on segment j→o
+  const j   = spurJunction(spur)
+  const ox  = spur.object.x
+  const oy  = spur.object.y
   const abx = ox - j.x
   const aby = oy - j.y
   const ab2 = abx * abx + aby * aby
   const t   = ab2 > 0 ? Math.max(0, Math.min(1, ((wx - j.x) * abx + (wy - j.y) * aby) / ab2)) : 0
-  const cx  = j.x + t * abx
-  const cy  = j.y + t * aby
-
-  const dx = wx - cx
-  const dy = wy - cy
-  return Math.sqrt(dx * dx + dy * dy)
+  const nx  = j.x + t * abx - wx
+  const ny  = j.y + t * aby - wy
+  return Math.sqrt(nx * nx + ny * ny)
 }
 
 function nearestSpur(wx: number, wy: number): { spur: Spur; dist: number } | null {
@@ -100,25 +103,30 @@ function nearestSpur(wx: number, wy: number): { spur: Spur; dist: number } | nul
 
 export function useDwell(cameraX: Ref<number>, cameraY: Ref<number>) {
   watch([cursorWorldX, cursorWorldY], ([wx, wy]) => {
-    // While excursing: if cursor wanders far from the target object, return
+    // During return: do nothing — let the tween finish undisturbed
+    if (returning) return
+
+    // At object: only watch for cursor leaving far enough
     if (dwellActive.value) {
       if (!dwellTarget.value) return
-      const dx = wx - dwellTarget.value.object.x
-      const dy = wy - dwellTarget.value.object.y
+      const dx   = wx - dwellTarget.value.object.x
+      const dy   = wy - dwellTarget.value.object.y
       const dist = Math.sqrt(dx * dx + dy * dy)
-      if (dist > LEAVE_RADIUS && !travelTween?.isActive()) startReturn()
+      // Only trigger if travel is done (not mid-flight to object)
+      if (dist > LEAVE_RADIUS && !moveTween?.isActive()) startReturn()
       return
     }
 
+    // Idle: look for ribbon proximity
     const nearest = nearestSpur(wx, wy)
     if (!nearest || nearest.dist > DWELL_RADIUS) {
-      if (dwellTarget.value) cancelDwell()
+      if (dwellTarget.value) cancelCountdown()
       return
     }
 
     const { spur } = nearest
     if (dwellTarget.value?.label !== spur.label) {
-      cancelDwell()
+      cancelCountdown()
       dwellTarget.value   = spur
       dwellProgress.value = 0
       countdownTween = gsap.to(dwellProgress, {

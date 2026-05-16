@@ -1,18 +1,31 @@
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import type { Ref } from 'vue'
 
+// Each waypoint has a label for identification.
+// The camera visits every waypoint in order.
 export const WAYPOINTS = [
-  { x: 2000, y: 0 },       // Hero
-  { x: 1200, y: 1400 },    // Abyss 1
-  { x: 2000, y: 2800 },    // Portrait Gallery
-  { x: 2800, y: 4200 },    // Abyss 2
-  { x: 2000, y: 5600 },    // Product Gallery
-  { x: 1200, y: 7000 },    // Abyss 3
-  { x: 2000, y: 8400 },    // Web Projects
-  { x: 2800, y: 9800 },    // Abyss 4
-  { x: 2000, y: 11200 },   // 3D Works
-  { x: 1200, y: 12600 },   // Abyss 5
-  { x: 2000, y: 14000 },   // Contacts
+  { x: 2000, y: 0,     label: 'hero' },
+  { x: 1200, y: 1400,  label: 'abyss1' },
+  { x: 2000, y: 2800,  label: 'portrait' },
+  { x: 2800, y: 4200,  label: 'abyss2' },
+  { x: 2000, y: 5600,  label: 'product' },
+  // Abyss 3 — main spine passes through x=1200, y=7000.
+  // Four detours peel off the spine, visit an object, return.
+  // Each detour: [exit point on spine] → [object] → [return to spine]
+  { x: 1350, y: 6500,  label: 'abyss3-entry' },   // approaching abyss 3
+  { x: 900,  y: 6750,  label: 'abyss3-z-2' },     // z−2 deep blob
+  { x: 1200, y: 6900,  label: 'abyss3-r1' },      // return to spine
+  { x: 1400, y: 7100,  label: 'abyss3-z-1' },     // z−1 mid blob
+  { x: 1200, y: 7200,  label: 'abyss3-r2' },      // return to spine
+  { x: 1100, y: 7400,  label: 'abyss3-z+1' },     // z+1 fore blob
+  { x: 1200, y: 7550,  label: 'abyss3-r3' },      // return to spine
+  { x: 1500, y: 7700,  label: 'abyss3-z+2' },     // z+2 sphere blob
+  { x: 1200, y: 7900,  label: 'abyss3-exit' },    // exit abyss 3
+  { x: 2000, y: 8400,  label: 'web' },
+  { x: 2800, y: 9800,  label: 'abyss4' },
+  { x: 2000, y: 11200, label: '3d' },
+  { x: 1200, y: 12600, label: 'abyss5' },
+  { x: 2000, y: 14000, label: 'contacts' },
 ]
 
 function cr(p0: number, p1: number, p2: number, p3: number, t: number): number {
@@ -24,7 +37,8 @@ function cr(p0: number, p1: number, p2: number, p3: number, t: number): number {
   )
 }
 
-function evalSpline(pts: typeof WAYPOINTS, progress: number) {
+function evalSpline(progress: number) {
+  const pts = WAYPOINTS
   const segs = pts.length - 1
   const scaled = Math.min(progress * segs, segs - 0.0001)
   const i = Math.floor(scaled)
@@ -39,12 +53,18 @@ function evalSpline(pts: typeof WAYPOINTS, progress: number) {
   }
 }
 
-// Numerical tangent — robust, works at any progress value
 function evalTangent(progress: number) {
   const eps = 0.001
-  const a = evalSpline(WAYPOINTS, Math.max(0, progress - eps))
-  const b = evalSpline(WAYPOINTS, Math.min(1, progress + eps))
+  const a = evalSpline(Math.max(0, progress - eps))
+  const b = evalSpline(Math.min(1, progress + eps))
   return { dx: b.x - a.x, dy: b.y - a.y }
+}
+
+// Progress value for a named waypoint
+export function progressOf(label: string): number {
+  const i = WAYPOINTS.findIndex(w => w.label === label)
+  if (i < 0) return 0
+  return i / (WAYPOINTS.length - 1)
 }
 
 export function getTangentAngle(progress: number): number {
@@ -70,8 +90,8 @@ export function buildSvgPath(): string {
 }
 
 export function useWorldCamera(pathProgress: Ref<number>) {
-  const cameraX = computed(() => evalSpline(WAYPOINTS, pathProgress.value).x)
-  const cameraY = computed(() => evalSpline(WAYPOINTS, pathProgress.value).y)
+  const cameraX = computed(() => evalSpline(pathProgress.value).x)
+  const cameraY = computed(() => evalSpline(pathProgress.value).y)
 
   const rotation = computed(() => {
     const { dx, dy } = evalTangent(pathProgress.value)

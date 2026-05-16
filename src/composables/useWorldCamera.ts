@@ -88,26 +88,28 @@ export function buildSvgPath(): string {
   return d
 }
 
-// ── Spurs (Sankey / river style) ──────────────────────────────────────────────
-// Each spur is a filled ribbon that fans out from the spine to embrace an object.
-// The ribbon has two edges — left and right — that start pinched at the junction
-// and open to a pool around the object.
-export interface Spur {
+// ── Highpoints (Sankey / river style) ────────────────────────────────────────
+// Each highpoint is a filled ribbon that fans from the spine to an object pool.
+export interface Highpoint {
   label:            string
-  junctionProgress: number            // where on the spine the ribbon departs
-  object:           { x: number; y: number }  // center of the pool
+  junctionProgress: number
+  object:           { x: number; y: number }
   color:            string
-  width:            number            // half-width of ribbon at the object end (px)
+  width:            number
 }
 
-export const ABYSS3_SPURS: Spur[] = [
+export const ABYSS3_HIGHPOINTS: Highpoint[] = [
   { label: 'z-2', junctionProgress: 0.46, object: { x: 620,  y: 6620 }, color: 'rgba(45,212,191,0.18)',  width: 90  },
   { label: 'z-1', junctionProgress: 0.48, object: { x: 1880, y: 6820 }, color: 'rgba(251,113,133,0.18)', width: 80  },
   { label: 'z+1', junctionProgress: 0.52, object: { x: 620,  y: 7180 }, color: 'rgba(110,231,183,0.18)', width: 75  },
   { label: 'z+2', junctionProgress: 0.54, object: { x: 1880, y: 7380 }, color: 'rgba(253,230,138,0.18)', width: 70  },
 ]
 
-export function spurJunction(s: Spur): { x: number; y: number } {
+// Legacy aliases
+export type Spur = Highpoint
+export const ABYSS3_SPURS = ABYSS3_HIGHPOINTS
+
+export function spurJunction(s: Highpoint): { x: number; y: number } {
   return evalSpline(s.junctionProgress)
 }
 

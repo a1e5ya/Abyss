@@ -1,89 +1,133 @@
 import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
-import gsap from 'gsap'
 import { ABYSS3_SPURS, spurJunction, cameraOverridePos, cursorWorldX, cursorWorldY } from './useWorldCamera'
 import { alignScrollToY } from './useScrollEngine'
 import type { Spur } from './useWorldCamera'
 
-const DWELL_RADIUS   = 500   // px along ribbon centerline — wide approach zone
-const DWELL_SECONDS  = 0.5
-const TRAVEL_SECONDS = 1.6
-const RETURN_SECONDS = 2.0
+// Renamed: "spur objects" are now highpoints
+export type Highpoint = Spur
 
-export const dwellTarget   = ref<Spur | null>(null)
-export const dwellProgress = ref(0)
-export const dwellActive   = ref(false)
+const ATTRACT_RADIUS = 600   // world-px — cursor within this range pulls camera
+const ATTRACT_LERP   = 0.028 // per-frame pull strength — low = dreamy float
+const RETURN_LERP    = 0.018 // slower drift back to spine
+const DWELL_SECONDS  = 0.4   // seconds hovering before camera starts moving
 
-let countdownTween: gsap.core.Tween | null = null
-let moveTween:      gsap.core.Tween | null = null
+export const highpointTarget   = ref<Highpoint | null>(null)
+export const highpointProgress = ref(0)   // 0→1 dwell fill
+export const highpointActive   = ref(false)
+
+// dwellTarget / dwellProgress / dwellActive kept as aliases for DwellIndicator
+export const dwellTarget   = highpointTarget
+export const dwellProgress = highpointProgress
+export const dwellActive   = highpointActive
+
+let dwellTimer: ReturnType<typeof setTimeout> | null = null
+let rafId: number | null = null
 let returning = false
+let progressFillStart = 0
 
-// ── Return ────────────────────────────────────────────────────────────────────
+// ── RAF loop — smooth lerp toward target or back to spine ─────────────────────
 
-function finishReturn() {
-  // Align scroll to junction Y in the next RAF tick (safe — no scrollTop side-effects now)
-  if (dwellTarget.value) alignScrollToY(spurJunction(dwellTarget.value).y)
-  cameraOverridePos.value = null
-  dwellActive.value       = false
-  dwellTarget.value       = null
-  dwellProgress.value     = 0
-  returning               = false
+function lerp(a: number, b: number, t: number) { return a + (b - a) * t }
+
+function tick() {
+  const target = highpointTarget.value
+
+  if (highpointActive.value && target) {
+    // Drift toward highpoint
+    const cur = cameraOverridePos.value ?? { x: 0, y: 0 }
+    const nx  = lerp(cur.x, target.object.x, ATTRACT_LERP)
+    const ny  = lerp(cur.y, target.object.y, ATTRACT_LERP)
+    cameraOverridePos.value = { x: nx, y: ny }
+
+    // Smoothly animate dwell progress fill proportional to proximity to target
+    const elapsed = (Date.now() - progressFillStart) / (DWELL_SECONDS * 1000)
+    highpointProgress.value = Math.min(elapsed, 1)
+
+  } else if (returning && cameraOverridePos.value) {
+    // Drift back toward spine junction of last target
+    const junction = highpointTarget.value
+      ? spurJunction(highpointTarget.value)
+      : cameraOverridePos.value
+
+    const cur = cameraOverridePos.value
+    const nx  = lerp(cur.x, junction.x, RETURN_LERP)
+    const ny  = lerp(cur.y, junction.y, RETURN_LERP)
+    const dx  = Math.abs(nx - junction.x)
+    const dy  = Math.abs(ny - junction.y)
+
+    if (dx < 2 && dy < 2) {
+      // Close enough — hand back to spine
+      alignScrollToY(junction.y)
+      cameraOverridePos.value  = null
+      returning                = false
+      highpointTarget.value    = null
+      highpointProgress.value  = 0
+    } else {
+      cameraOverridePos.value = { x: nx, y: ny }
+    }
+  } else {
+    rafId = null
+    return
+  }
+
+  rafId = requestAnimationFrame(tick)
 }
+
+function ensureRaf() {
+  if (rafId === null) rafId = requestAnimationFrame(tick)
+}
+
+// ── Return (scroll triggered) ─────────────────────────────────────────────────
 
 export function startReturn() {
-  if (returning || !cameraOverridePos.value) return
-  returning = true
-  moveTween?.kill()
-
-  const from = { ...cameraOverridePos.value }
-  const to   = dwellTarget.value ? spurJunction(dwellTarget.value) : from
-
-  moveTween = gsap.to(from, {
-    x: to.x,
-    y: to.y,
-    duration: RETURN_SECONDS,
-    ease: 'power1.inOut',
-    onUpdate() { cameraOverridePos.value = { x: from.x, y: from.y } },
-    onComplete: finishReturn,
-  })
+  if (returning) return
+  returning             = true
+  highpointActive.value = false
+  clearDwellTimer()
+  ensureRaf()
 }
 
-// Called by useScrollEngine when scroll happens while active
 export function onScrollWhileExcursing() {
-  if (dwellActive.value) startReturn()
+  if (highpointActive.value || returning) startReturn()
 }
 
-// ── Countdown / travel ────────────────────────────────────────────────────────
+// ── Countdown / proximity ─────────────────────────────────────────────────────
 
-function cancelCountdown() {
-  countdownTween?.kill()
-  countdownTween      = null
-  dwellTarget.value   = null
-  dwellProgress.value = 0
+function clearDwellTimer() {
+  if (dwellTimer !== null) { clearTimeout(dwellTimer); dwellTimer = null }
 }
 
-function excurse(spur: Spur, cameraX: Ref<number>, cameraY: Ref<number>) {
-  dwellActive.value = true
-  countdownTween    = null
-  returning         = false
+function startDwell(hp: Highpoint, cameraX: Ref<number>, cameraY: Ref<number>) {
+  if (highpointTarget.value?.label === hp.label) return
+  clearDwellTimer()
 
-  const proxy = { x: cameraX.value, y: cameraY.value }
-  moveTween?.kill()
-  moveTween = gsap.to(proxy, {
-    x: spur.object.x,
-    y: spur.object.y,
-    duration: TRAVEL_SECONDS,
-    ease: 'power2.inOut',
-    onUpdate() { cameraOverridePos.value = { x: proxy.x, y: proxy.y } },
-  })
+  highpointTarget.value   = hp
+  highpointProgress.value = 0
+  progressFillStart       = Date.now()
+
+  // Set override to current camera position so lerp starts from here
+  cameraOverridePos.value = { x: cameraX.value, y: cameraY.value }
+
+  dwellTimer = setTimeout(() => {
+    highpointActive.value = true
+    ensureRaf()
+  }, DWELL_SECONDS * 1000)
 }
 
-// ── Proximity ─────────────────────────────────────────────────────────────────
+function cancelDwell() {
+  clearDwellTimer()
+  if (!highpointActive.value && !returning) {
+    cameraOverridePos.value  = null
+    highpointTarget.value    = null
+    highpointProgress.value  = 0
+  }
+}
 
-function distToSpur(wx: number, wy: number, spur: Spur): number {
-  const j   = spurJunction(spur)
-  const ox  = spur.object.x
-  const oy  = spur.object.y
+function distToHighpoint(wx: number, wy: number, hp: Highpoint): number {
+  const j   = spurJunction(hp)
+  const ox  = hp.object.x
+  const oy  = hp.object.y
   const abx = ox - j.x
   const aby = oy - j.y
   const ab2 = abx * abx + aby * aby
@@ -93,11 +137,11 @@ function distToSpur(wx: number, wy: number, spur: Spur): number {
   return Math.sqrt(nx * nx + ny * ny)
 }
 
-function nearestSpur(wx: number, wy: number): { spur: Spur; dist: number } | null {
-  let best: { spur: Spur; dist: number } | null = null
-  for (const spur of ABYSS3_SPURS) {
-    const dist = distToSpur(wx, wy, spur)
-    if (!best || dist < best.dist) best = { spur, dist }
+function nearest(wx: number, wy: number): { hp: Highpoint; dist: number } | null {
+  let best: { hp: Highpoint; dist: number } | null = null
+  for (const hp of ABYSS3_SPURS) {
+    const dist = distToHighpoint(wx, wy, hp)
+    if (!best || dist < best.dist) best = { hp, dist }
   }
   return best
 }
@@ -106,32 +150,14 @@ function nearestSpur(wx: number, wy: number): { spur: Spur; dist: number } | nul
 
 export function useDwell(cameraX: Ref<number>, cameraY: Ref<number>) {
   watch([cursorWorldX, cursorWorldY], ([wx, wy]) => {
-    // While returning: completely hands-off — tween runs to completion
     if (returning) return
+    if (highpointActive.value) return   // camera is floating to target — don't interfere
 
-    // While at object: no cursor-triggered return — only scroll triggers it.
-    // This prevents the camera shake caused by cursorWorld shifting as the
-    // camera moves and re-triggering the leave check.
-    if (dwellActive.value) return
-
-    // Idle: check ribbon proximity for countdown
-    const nearest = nearestSpur(wx, wy)
-    if (!nearest || nearest.dist > DWELL_RADIUS) {
-      if (dwellTarget.value) cancelCountdown()
+    const hit = nearest(wx, wy)
+    if (!hit || hit.dist > ATTRACT_RADIUS) {
+      cancelDwell()
       return
     }
-
-    const { spur } = nearest
-    if (dwellTarget.value?.label !== spur.label) {
-      cancelCountdown()
-      dwellTarget.value   = spur
-      dwellProgress.value = 0
-      countdownTween = gsap.to(dwellProgress, {
-        value: 1,
-        duration: DWELL_SECONDS,
-        ease: 'none',
-        onComplete: () => excurse(spur, cameraX, cameraY),
-      })
-    }
+    startDwell(hit.hp, cameraX, cameraY)
   })
 }

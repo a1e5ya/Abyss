@@ -72,6 +72,25 @@ function objectStyle(waypointIndex: number, w: number, h: number) {
   }
 }
 
+// Abyss 3 spurs — each object gets its own branch off the main spine.
+// root: departure point on the main line (staggered y values)
+// end:  object position
+// color matches the object's color token (resolved at render time via CSS var)
+const ABYSS3_SPURS = [
+  { root: { x: 1350, y: 6650 }, end: { x: 900,  y: 6750 }, color: 'rgba(45,212,191,0.35)'  }, // z-2 atmo-teal
+  { root: { x: 1100, y: 6850 }, end: { x: 1400, y: 7100 }, color: 'rgba(251,113,133,0.35)' }, // z-1 atmo-coral
+  { root: { x: 1300, y: 7150 }, end: { x: 1100, y: 7300 }, color: 'rgba(110,231,183,0.5)'  }, // z+1 iris-mint
+  { root: { x: 1050, y: 6950 }, end: { x: 1500, y: 6900 }, color: 'rgba(253,230,138,0.5)'  }, // z+2 iris-gold
+]
+
+function spurPath(s: typeof ABYSS3_SPURS[0]): string {
+  // Simple quadratic bezier: control point halfway between root and end,
+  // offset perpendicular so it reads as a genuine branch not a straight line
+  const mx = (s.root.x + s.end.x) / 2 + (s.end.y - s.root.y) * 0.25
+  const my = (s.root.y + s.end.y) / 2 - (s.end.x - s.root.x) * 0.25
+  return `M ${s.root.x} ${s.root.y} Q ${mx} ${my} ${s.end.x} ${s.end.y}`
+}
+
 const svgPath = buildSvgPath()
 </script>
 
@@ -103,7 +122,24 @@ const svgPath = buildSvgPath()
     >{{ obj.label }}</div>
 
     <svg class="path-spine" viewBox="0 0 4000 14000" preserveAspectRatio="none">
+      <!-- Main spine -->
       <path :d="svgPath" fill="none" stroke="rgba(201,149,108,0.2)" stroke-width="3" stroke-dasharray="16 10" />
+      <!-- Abyss 3 spurs -->
+      <path
+        v-for="(spur, i) in ABYSS3_SPURS" :key="'spur'+i"
+        :d="spurPath(spur)"
+        fill="none"
+        :stroke="spur.color"
+        stroke-width="1.5"
+        stroke-dasharray="6 5"
+      />
+      <!-- Spur root dots -->
+      <circle
+        v-for="(spur, i) in ABYSS3_SPURS" :key="'root'+i"
+        :cx="spur.root.x" :cy="spur.root.y" r="4"
+        :fill="spur.color"
+      />
+      <!-- Waypoint dots -->
       <circle v-for="(wp, i) in WAYPOINTS" :key="i"
         :cx="wp.x" :cy="wp.y" r="8"
         :fill="i % 2 === 0 ? '#c9956c' : '#a855f7'"

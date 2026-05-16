@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+:root {
+  /* Structured side */
+  --col-gold:        #c9956c;
+  --col-brass:       #b8860b;
+  --col-ivory:       #e8d5b0;
+  --col-bone:        #f5ede0;
+
+  /* Wild side */
+  --col-deep:        #0d1117;
+  --col-charcoal:    #1a2420;
+  --col-purple:      #6b21a8;
+  --col-chem-green:  #39d353;
+  --col-glow:        #a855f7;
+  --col-lime:        #84cc16;
+
+  /* Iridescence */
+  --iris-pink:       #f9a8d4;
+  --iris-mint:       #6ee7b7;
+  --iris-lavender:   #c4b5fd;
+  --iris-gold:       #fde68a;
+
+  /* Atmosphere */
+  --atmo-coral:      rgba(251, 113, 133, 0.35);
+  --atmo-sage:       rgba(74, 222, 128, 0.25);
+  --atmo-teal:       rgba(45, 212, 191, 0.2);
+  --atmo-rose:       rgba(244, 114, 182, 0.2);
+
+  /* Depth blur */
+  --blur-deep:       12px;
+  --blur-mid:        4px;
+  --blur-surface:    0px;
+
+  /* Parallax factors */
+  --par-deep:        0.15;
+  --par-mid:         0.45;
+  --par-fore:        1.55;
+  --par-sphere:      2.1;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--col-deep);
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}

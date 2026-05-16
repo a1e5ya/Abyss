@@ -28,29 +28,31 @@ export interface Spur {
   color: string
 }
 
+// Spine passes through x=1200, y=7000.
+// Spurs branch left and right alternately, all staying within world bounds.
 export const ABYSS3_SPURS: Spur[] = [
   {
     label:    'z-2',
-    junction: { x: 1350, y: 6600 },
-    object:   { x: 700,  y: 6700 },
+    junction: { x: 1250, y: 6700 },
+    object:   { x: 600,  y: 6650 },
     color:    'rgba(45,212,191,0.5)',
   },
   {
     label:    'z-1',
-    junction: { x: 1050, y: 6850 },
-    object:   { x: 550,  y: 7050 },
+    junction: { x: 1150, y: 6900 },
+    object:   { x: 1800, y: 6820 },
     color:    'rgba(251,113,133,0.5)',
   },
   {
     label:    'z+1',
-    junction: { x: 1300, y: 7150 },
-    object:   { x: 2800, y: 7050 },
+    junction: { x: 1250, y: 7100 },
+    object:   { x: 600,  y: 7200 },
     color:    'rgba(110,231,183,0.6)',
   },
   {
     label:    'z+2',
-    junction: { x: 1050, y: 7350 },
-    object:   { x: 2900, y: 7400 },
+    junction: { x: 1150, y: 7300 },
+    object:   { x: 1800, y: 7380 },
     color:    'rgba(253,230,138,0.6)',
   },
 ]

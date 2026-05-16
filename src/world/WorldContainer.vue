@@ -1,29 +1,29 @@
 <script setup lang="ts">
 import { useScrollEngine } from '../composables/useScrollEngine'
 import { useWorldCamera } from '../composables/useWorldCamera'
+import { useDwell } from '../composables/useDwell'
+import DwellIndicator from './DwellIndicator.vue'
 
 const { pathProgress, smoothScrollY } = useScrollEngine()
 const { cameraX, cameraY, rotation, worldTransform } = useWorldCamera(pathProgress)
+
+useDwell(cameraX, cameraY)
 </script>
 
 <template>
-  <!-- Scroll driver: tall invisible div that generates scroll events -->
   <div id="scroll-driver" class="scroll-driver">
     <div class="scroll-spacer" />
   </div>
 
-  <!-- Fixed viewport: the needle -->
   <div class="viewport">
-    <!-- World fabric: moves beneath the needle -->
     <div class="world" :style="{ transform: worldTransform }">
       <slot />
+      <DwellIndicator />
     </div>
   </div>
 
-  <!-- Debug overlay -->
   <div class="debug">
     <div>progress <span>{{ (pathProgress * 100).toFixed(1) }}%</span></div>
-    <div>scroll Y <span>{{ smoothScrollY.toFixed(0) }}</span></div>
     <div>cam X <span>{{ cameraX.toFixed(0) }}</span></div>
     <div>cam Y <span>{{ cameraY.toFixed(0) }}</span></div>
     <div>rotation <span>{{ rotation.toFixed(2) }}°</span></div>
@@ -31,28 +31,20 @@ const { cameraX, cameraY, rotation, worldTransform } = useWorldCamera(pathProgre
 </template>
 
 <style scoped>
-/* Scroll driver sits behind everything, fills viewport, scrolls */
 .scroll-driver {
   position: fixed;
   inset: 0;
   overflow-y: scroll;
   z-index: 10;
-  /* transparent so the world shows through */
-  pointer-events: none;
-}
-/* Re-enable pointer events only for actual scrolling */
-.scroll-driver {
   pointer-events: auto;
 }
 
-/* Spacer makes the scroll driver tall enough to drive the full world journey */
 .scroll-spacer {
   height: 14000px;
   width: 1px;
   pointer-events: none;
 }
 
-/* Fixed viewport — the needle that never moves */
 .viewport {
   position: fixed;
   inset: 0;
@@ -60,7 +52,6 @@ const { cameraX, cameraY, rotation, worldTransform } = useWorldCamera(pathProgre
   pointer-events: none;
 }
 
-/* World — the fabric that moves */
 .world {
   position: absolute;
   top: 0;

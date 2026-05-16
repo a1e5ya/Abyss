@@ -132,9 +132,19 @@ export function buildSvgPath(): string {
   return d
 }
 
+import { ref as vref } from 'vue'
+
+// When set, the camera travels to this world position instead of following the spine.
+// useDwell writes here; null means follow the spine normally.
+export const cameraOverridePos = vref<{ x: number; y: number } | null>(null)
+
 export function useWorldCamera(pathProgress: Ref<number>) {
-  const cameraX = computed(() => evalSpline(pathProgress.value).x)
-  const cameraY = computed(() => evalSpline(pathProgress.value).y)
+  const cameraX = computed(() =>
+    cameraOverridePos.value !== null ? cameraOverridePos.value.x : evalSpline(pathProgress.value).x
+  )
+  const cameraY = computed(() =>
+    cameraOverridePos.value !== null ? cameraOverridePos.value.y : evalSpline(pathProgress.value).y
+  )
 
   const rotation = computed(() => {
     const { dx, dy } = evalTangent(pathProgress.value)

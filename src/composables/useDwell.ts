@@ -151,9 +151,21 @@ function nearest(wx: number, wy: number): { hp: Highpoint; dist: number } | null
 export function useDwell(cameraX: Ref<number>, cameraY: Ref<number>) {
   watch([cursorWorldX, cursorWorldY], ([wx, wy]) => {
     if (returning) return
-    if (highpointActive.value) return   // camera is floating to target — don't interfere
 
     const hit = nearest(wx, wy)
+
+    if (highpointActive.value) {
+      // Point-to-point: cursor near a different highpoint → redirect drift there directly
+      if (hit && hit.dist < ATTRACT_RADIUS && hit.hp.label !== highpointTarget.value?.label) {
+        highpointTarget.value   = hit.hp
+        progressFillStart       = Date.now()
+        highpointProgress.value = 0
+        // cameraOverridePos stays where it is — lerp continues from current position
+        ensureRaf()
+      }
+      return
+    }
+
     if (!hit || hit.dist > ATTRACT_RADIUS) {
       cancelDwell()
       return

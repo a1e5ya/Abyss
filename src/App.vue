@@ -6,6 +6,7 @@ import {
   getTangentAngle, buildSvgPath, buildSpineSegment, progressOf,
   spurRibbonPath, spurCenterPath, spurObjectAngle, spurJunction,
 } from './composables/useWorldCamera'
+import { highpointTarget, highpointActive } from './composables/useDwell'
 import { useViewport } from './composables/useViewport'
 
 const { vw, vh } = useViewport()
@@ -146,17 +147,23 @@ const abyss3SpinePath = buildSpineSegment(0.44, 0.56)
       <path
         v-for="spur in ABYSS3_SPURS" :key="'r-'+spur.label"
         :d="spurRibbonPath(spur)"
-        :fill="spur.color"
+        :fill="highpointActive && highpointTarget?.label === spur.label
+          ? spur.color.replace('0.18', '0.55')
+          : spur.color"
         stroke="none"
+        style="transition: fill 1.2s ease"
       />
-      <!-- Center guide (subtle dashed) -->
+      <!-- Center guide — brightens when active -->
       <path
         v-for="spur in ABYSS3_SPURS" :key="'c-'+spur.label"
         :d="spurCenterPath(spur)"
         fill="none"
-        :stroke="spur.color.replace('0.18', '0.4')"
-        stroke-width="1"
-        stroke-dasharray="4 4"
+        :stroke="highpointActive && highpointTarget?.label === spur.label
+          ? spur.color.replace('0.18', '0.7')
+          : spur.color.replace('0.18', '0.3')"
+        :stroke-width="highpointActive && highpointTarget?.label === spur.label ? 2 : 1"
+        stroke-dasharray="6 5"
+        style="transition: stroke 1.2s ease, stroke-width 1.2s ease"
       />
 
       <!-- Main spine on top -->

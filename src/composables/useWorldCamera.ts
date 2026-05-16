@@ -113,90 +113,69 @@ export function spurJunction(s: Highpoint): { x: number; y: number } {
   return evalSpline(s.junctionProgress)
 }
 
-// Sankey ribbon — true flow shape.
-// The centerline is a cubic bezier from junction to object, with control points
-// that curve naturally based on the spine tangent at the junction.
-// Both edges are the centerline offset perpendicularly by half-width,
-// sampled at N points to build a smooth filled polygon.
-// Width is uniform along the full length — no pinch, no flare.
+// Thorn / branch shape — wide at the spine root, tapering to the object tip.
+// Two cubic bezier edges grow from the spine junction, meeting at the object.
+// Left edge curves one way, right edge the other — natural organic branch.
 export function spurRibbonPath(s: Highpoint): string {
-  const j   = spurJunction(s)
-  const ox  = s.object.x
-  const oy  = s.object.y
-  const w   = s.width
-  const STEPS = 32
+  const j  = spurJunction(s)
+  const ox = s.object.x
+  const oy = s.object.y
+  const w  = s.width   // half-width at the root
 
-  // Spine tangent at junction gives the departure direction
+  // Spine tangent — root direction
   const tang = evalTangent(s.junctionProgress)
-  const tlen = Math.sqrt(tang.dx * tang.dx + tang.dy * tang.dy) || 1
-  const tx   = tang.dx / tlen
+  const tlen = Math.sqrt(tang.dx ** 2 + tang.dy ** 2) || 1
+  const tx   = tang.dx / tlen   // along-spine unit
   const ty   = tang.dy / tlen
+  const px   = -ty              // perpendicular unit (left)
+  const py   =  tx
 
-  // Centerline bezier: departs along spine tangent, arrives straight at object
-  const dist  = Math.sqrt((ox - j.x) ** 2 + (oy - j.y) ** 2)
-  const pull  = dist * 0.5
-  const cp1x  = j.x + tx * pull
-  const cp1y  = j.y + ty * pull
-  const cp2x  = ox - (ox - j.x) / dist * pull * 0.4
-  const cp2y  = oy - (oy - j.y) / dist * pull * 0.4
+  // Root edge points on the spine (left and right of junction)
+  const rlx = j.x + px * w
+  const rly = j.y + py * w
+  const rrx = j.x - px * w
+  const rry = j.y - py * w
 
-  // Sample centerline and compute per-point perpendicular
-  function bezier(t: number) {
-    const u = 1 - t
-    return {
-      x: u*u*u*j.x + 3*u*u*t*cp1x + 3*u*t*t*cp2x + t*t*t*ox,
-      y: u*u*u*j.y + 3*u*u*t*cp1y + 3*u*t*t*cp2y + t*t*t*oy,
-    }
-  }
-  function bezierTangent(t: number) {
-    const u = 1 - t
-    const dx = 3*(u*u*(cp1x-j.x) + 2*u*t*(cp2x-cp1x) + t*t*(ox-cp2x))
-    const dy = 3*(u*u*(cp1y-j.y) + 2*u*t*(cp2y-cp1y) + t*t*(oy-cp2y))
-    const len = Math.sqrt(dx*dx + dy*dy) || 1
-    return { px: -dy/len, py: dx/len }  // perpendicular
-  }
+  // Vector from junction to object
+  const dx   = ox - j.x
+  const dy   = oy - j.y
+  const dist = Math.sqrt(dx ** 2 + dy ** 2) || 1
 
-  const left:  string[] = []
-  const right: string[] = []
+  // Control points: each edge curves from its root corner toward the object.
+  // The "bow" pushes each edge outward before converging at the tip.
+  const bow = dist * 0.45
+  const f   = (n: number) => n.toFixed(1)
 
-  for (let i = 0; i <= STEPS; i++) {
-    const t  = i / STEPS
-    const pt = bezier(t)
-    const { px, py } = bezierTangent(t)
-    left.push(`${(pt.x + px * w).toFixed(1)},${(pt.y + py * w).toFixed(1)}`)
-    right.push(`${(pt.x - px * w).toFixed(1)},${(pt.y - py * w).toFixed(1)}`)
-  }
+  // Left edge: root-left → control (pushed left) → object tip
+  const cl1x = rlx + dx * 0.5 + px * bow
+  const cl1y = rly + dy * 0.5 + py * bow
+  const cl2x = ox  + px * w * 0.15
+  const cl2y = oy  + py * w * 0.15
 
-  const f = (n: number) => n.toFixed(1)
+  // Right edge: object tip → control (pushed right) → root-right
+  const cr1x = ox  - px * w * 0.15
+  const cr1y = oy  - py * w * 0.15
+  const cr2x = rrx + dx * 0.5 - px * bow
+  const cr2y = rry + dy * 0.5 - py * bow
+
   return [
-    `M ${left[0]}`,
-    ...left.slice(1).map(p => `L ${p}`),
-    `A ${f(w)} ${f(w)} 0 0 1 ${right[STEPS]}`,   // arc cap at object end
-    ...right.slice(0, STEPS).reverse().map(p => `L ${p}`),
-    `A ${f(w)} ${f(w)} 0 0 1 ${left[0]}`,         // arc cap at junction end
+    `M ${f(rlx)} ${f(rly)}`,
+    `C ${f(cl1x)} ${f(cl1y)}, ${f(cl2x)} ${f(cl2y)}, ${f(ox)} ${f(oy)}`,   // left edge to tip
+    `C ${f(cr1x)} ${f(cr1y)}, ${f(cr2x)} ${f(cr2y)}, ${f(rrx)} ${f(rry)}`, // right edge back
+    `A ${f(w)} ${f(w)} 0 0 1 ${f(rlx)} ${f(rly)}`,  // arc closing the root
     'Z',
   ].join(' ')
 }
 
-// Centerline stroke — the bezier spine of the ribbon
+// Centerline — straight bezier from junction to object tip
 export function spurCenterPath(s: Highpoint): string {
   const j  = spurJunction(s)
   const ox = s.object.x
   const oy = s.object.y
-
-  const tang = evalTangent(s.junctionProgress)
-  const tlen = Math.sqrt(tang.dx * tang.dx + tang.dy * tang.dy) || 1
-  const tx   = tang.dx / tlen
-  const ty   = tang.dy / tlen
-  const dist = Math.sqrt((ox - j.x) ** 2 + (oy - j.y) ** 2)
-  const pull = dist * 0.5
-  const cp1x = j.x + tx * pull
-  const cp1y = j.y + ty * pull
-  const cp2x = ox - (ox - j.x) / dist * pull * 0.4
-  const cp2y = oy - (oy - j.y) / dist * pull * 0.4
-
-  const f = (n: number) => n.toFixed(1)
-  return `M ${f(j.x)} ${f(j.y)} C ${f(cp1x)} ${f(cp1y)}, ${f(cp2x)} ${f(cp2y)}, ${f(ox)} ${f(oy)}`
+  const mx = (j.x + ox) / 2
+  const my = (j.y + oy) / 2
+  const f  = (n: number) => n.toFixed(1)
+  return `M ${f(j.x)} ${f(j.y)} Q ${f(mx)} ${f(my)}, ${f(ox)} ${f(oy)}`
 }
 
 export function spurObjectAngle(s: Spur): number {

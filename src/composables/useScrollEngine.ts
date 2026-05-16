@@ -1,5 +1,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { cursorVy } from './useCursor'
+import { highpointActive, highpointTarget } from './useDwell'
 
 const WORLD_HEIGHT   = 14000
 const LERP_DEFAULT   = 0.075
@@ -43,7 +44,9 @@ function cursorAtEdge(deltaY: number): boolean {
 }
 
 function onWheel(e: WheelEvent) {
-  if (inAbyss3() && !cursorAtEdge(e.deltaY)) {
+  // Lock scroll only when actively at a highpoint, not during plain passage.
+  const locked = highpointActive.value || highpointTarget.value !== null
+  if (inAbyss3() && locked && !cursorAtEdge(e.deltaY)) {
     e.preventDefault()
   }
 }

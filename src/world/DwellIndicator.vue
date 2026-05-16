@@ -11,9 +11,9 @@ const strokeDash = computed(() => {
 })
 
 // Ring draws at the object, not the junction — that's where the cursor is
-const ox    = computed(() => dwellTarget.value?.object.x ?? 0)
-const oy    = computed(() => dwellTarget.value?.object.y ?? 0)
-const color = computed(() => dwellTarget.value?.color.replace('0.18', '0.8') ?? 'white')
+const ox    = computed(() => dwellTarget.value?.x ?? 0)
+const oy    = computed(() => dwellTarget.value?.y ?? 0)
+const color = computed(() => dwellTarget.value?.color ?? 'white')
 </script>
 
 <template>

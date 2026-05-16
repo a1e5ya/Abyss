@@ -2,9 +2,8 @@
 import { computed } from 'vue'
 import WorldContainer from './world/WorldContainer.vue'
 import {
-  WAYPOINTS, ABYSS3_SPURS,
-  getTangentAngle, buildSvgPath, buildSpineSegment, progressOf,
-  spurRibbonPath, spurCenterPath, spurObjectAngle, spurJunction,
+  WAYPOINTS, ABYSS3_HIGHPOINTS, ABYSS3_CENTER,
+  getTangentAngle, buildSvgPath, progressOf,
 } from './composables/useWorldCamera'
 import { highpointTarget, highpointActive } from './composables/useDwell'
 import { useViewport } from './composables/useViewport'
@@ -25,7 +24,6 @@ const STATIONS = [
 
 const ABYSS_LABELS = ['abyss1', 'abyss2', 'abyss3', 'abyss4', 'abyss5']
 
-// Abyss 1 — 4 depth objects scattered near the abyss1 waypoint (x=1200, y=1400)
 const ABYSS1_OBJECTS = [
   { x: 800,  y: 1100, z: -2, color: 'var(--atmo-teal)',  size: 110, blur: 'var(--blur-deep)', scale: 0.6, zText: 'z −2' },
   { x: 1000, y: 1350, z: -1, color: 'var(--atmo-rose)',  size: 90,  blur: 'var(--blur-mid)',  scale: 0.8, zText: 'z −1' },
@@ -33,13 +31,8 @@ const ABYSS1_OBJECTS = [
   { x: 1700, y: 1200, z:  2, color: 'var(--col-gold)',   size: 70,  blur: '0px',              scale: 1.3, zText: 'z +2' },
 ]
 
-// Abyss 3 — objects sit at the end of their spurs
-const ABYSS3_OBJECTS = [
-  { spur: ABYSS3_SPURS[0], z: -2, color: 'var(--atmo-sage)',  size: 110, blur: 'var(--blur-deep)', scale: 0.6, zText: 'z −2' },
-  { spur: ABYSS3_SPURS[1], z: -1, color: 'var(--atmo-coral)', size: 90,  blur: 'var(--blur-mid)',  scale: 0.8, zText: 'z −1' },
-  { spur: ABYSS3_SPURS[2], z:  1, color: 'var(--iris-mint)',  size: 80,  blur: '0px',              scale: 1.1, zText: 'z +1' },
-  { spur: ABYSS3_SPURS[3], z:  2, color: 'var(--iris-gold)',  size: 70,  blur: '0px',              scale: 1.3, zText: 'z +2' },
-]
+// Abyss 3 center glow radius
+const ABYSS3_GLOW_R = 600
 
 function stationStyle(wpLabel: string) {
   const progress = progressOf(wpLabel)
@@ -74,27 +67,26 @@ function abyss1ObjStyle(obj: typeof ABYSS1_OBJECTS[0]) {
     background: obj.color,
     filter:     `blur(${obj.blur})`,
     transform:  `translate(-50%, -50%) scale(${obj.scale})`,
-    zIndex:     String(obj.z + 3),
   }
 }
 
-function abyss3ObjStyle(obj: typeof ABYSS3_OBJECTS[0]) {
-  const angle = spurObjectAngle(obj.spur)
+function highpointStyle(hp: typeof ABYSS3_HIGHPOINTS[0]) {
+  const isActive = highpointActive.value && highpointTarget.value?.label === hp.label
+  const isPending = !highpointActive.value && highpointTarget.value?.label === hp.label
+  const scale = isActive ? 1.25 : isPending ? 1.08 : 1
   return {
-    left:       `${obj.spur.object.x}px`,
-    top:        `${obj.spur.object.y}px`,
-    width:      `${obj.size}px`,
-    height:     `${obj.size}px`,
-    background: obj.color,
-    filter:     `blur(${obj.blur})`,
-    transform:  `translate(-50%, -50%) scale(${obj.scale}) rotate(${-angle}deg)`,
-    zIndex:     String(obj.z + 3),
+    left:      `${hp.x}px`,
+    top:       `${hp.y}px`,
+    width:     `${hp.size}px`,
+    height:    `${hp.size}px`,
+    background: `radial-gradient(circle, ${hp.color} 0%, ${hp.color.replace(',1)', ',0)')} 100%)`,
+    transform: `translate(-50%, -50%) scale(${scale})`,
+    boxShadow: isActive ? `0 0 60px 20px ${hp.color.replace(',1)', ',0.35)')}` : 'none',
+    transition: 'transform 1.5s ease, box-shadow 1.5s ease',
   }
 }
 
 const svgPath = buildSvgPath()
-// Wide spine overlay covering the full Abyss 3 Sankey section
-const abyss3SpinePath = buildSpineSegment(0.44, 0.56)
 </script>
 
 <template>
@@ -122,59 +114,34 @@ const abyss3SpinePath = buildSpineSegment(0.44, 0.56)
       v-for="obj in ABYSS1_OBJECTS" :key="'a1-'+obj.zText"
       class="depth-obj"
       :style="abyss1ObjStyle(obj)"
-    >{{ obj.zText }}</div>
+    />
 
-    <!-- Abyss 3 spur objects -->
+    <!-- Abyss 3 highpoints — floating objects around the central zone -->
     <div
-      v-for="obj in ABYSS3_OBJECTS" :key="'a3-'+obj.zText"
-      class="depth-obj"
-      :style="abyss3ObjStyle(obj)"
-    >{{ obj.zText }}</div>
+      v-for="hp in ABYSS3_HIGHPOINTS" :key="'hp-'+hp.label"
+      class="highpoint"
+      :style="highpointStyle(hp)"
+    />
 
-    <!-- Path spine + Sankey ribbons -->
+    <!-- Path spine -->
     <svg class="path-spine" viewBox="0 0 4000 14000" preserveAspectRatio="none">
-      <!-- Wide spine through Abyss 3 Sankey section — matches ribbon origin width -->
-      <path
-        :d="abyss3SpinePath"
-        fill="none"
-        stroke="rgba(201,149,108,0.10)"
-        stroke-width="320"
-        stroke-linecap="round"
-        stroke-linejoin="round"
+
+      <!-- Abyss 3 central atmospheric zone — radial gradient glow -->
+      <defs>
+        <radialGradient id="abyss3glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stop-color="rgba(180,140,255,0.18)" />
+          <stop offset="55%"  stop-color="rgba(120,80,220,0.07)" />
+          <stop offset="100%" stop-color="rgba(80,40,180,0)" />
+        </radialGradient>
+      </defs>
+      <ellipse
+        :cx="ABYSS3_CENTER.x" :cy="ABYSS3_CENTER.y"
+        :rx="ABYSS3_GLOW_R" :ry="ABYSS3_GLOW_R * 0.75"
+        fill="url(#abyss3glow)"
       />
 
-      <!-- Sankey ribbons (filled, behind spine) -->
-      <path
-        v-for="spur in ABYSS3_SPURS" :key="'r-'+spur.label"
-        :d="spurRibbonPath(spur)"
-        :fill="highpointActive && highpointTarget?.label === spur.label
-          ? spur.color.replace('0.18', '0.55')
-          : spur.color"
-        stroke="none"
-        style="transition: fill 1.2s ease"
-      />
-      <!-- Center guide — brightens when active -->
-      <path
-        v-for="spur in ABYSS3_SPURS" :key="'c-'+spur.label"
-        :d="spurCenterPath(spur)"
-        fill="none"
-        :stroke="highpointActive && highpointTarget?.label === spur.label
-          ? spur.color.replace('0.18', '0.7')
-          : spur.color.replace('0.18', '0.3')"
-        :stroke-width="highpointActive && highpointTarget?.label === spur.label ? 2 : 1"
-        stroke-dasharray="6 5"
-        style="transition: stroke 1.2s ease, stroke-width 1.2s ease"
-      />
-
-      <!-- Main spine on top -->
+      <!-- Main spine -->
       <path :d="svgPath" fill="none" stroke="rgba(201,149,108,0.25)" stroke-width="3" stroke-dasharray="16 10" />
-
-      <!-- Junction dots on spine -->
-      <circle
-        v-for="spur in ABYSS3_SPURS" :key="'j-'+spur.label"
-        :cx="spurJunction(spur).x" :cy="spurJunction(spur).y"
-        r="4" :fill="spur.color.replace('0.18', '0.7')"
-      />
 
       <!-- Spine waypoint dots -->
       <circle v-for="(wp, i) in WAYPOINTS" :key="i"
@@ -222,12 +189,11 @@ const abyss3SpinePath = buildSpineSegment(0.44, 0.56)
 .depth-obj {
   position: absolute;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: ui-monospace, monospace;
-  font-size: 9px;
-  color: rgba(255,255,255,0.6);
+  pointer-events: none;
+}
+.highpoint {
+  position: absolute;
+  border-radius: 50%;
   pointer-events: none;
 }
 .path-spine {

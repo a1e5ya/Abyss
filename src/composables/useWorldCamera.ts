@@ -88,102 +88,26 @@ export function buildSvgPath(): string {
   return d
 }
 
-// ── Highpoints (Sankey / river style) ────────────────────────────────────────
-// Each highpoint is a filled ribbon that fans from the spine to an object pool.
+// ── Abyss 3 highpoints ────────────────────────────────────────────────────────
+// Floating objects around a central atmospheric zone.
+// No connections, no ribbons — just positions in world space.
 export interface Highpoint {
-  label:            string
-  junctionProgress: number
-  object:           { x: number; y: number }
-  color:            string
-  width:            number
+  label:  string
+  x:      number
+  y:      number
+  color:  string   // full rgba string used for glow and dwell ring
+  size:   number   // diameter in px
 }
+
+// Center of the Abyss 3 zone — spine passes near x=1200, y=7000
+export const ABYSS3_CENTER = { x: 1200, y: 7000 }
 
 export const ABYSS3_HIGHPOINTS: Highpoint[] = [
-  { label: 'z-2', junctionProgress: 0.46, object: { x: 620,  y: 6620 }, color: 'rgba(45,212,191,0.18)',  width: 90  },
-  { label: 'z-1', junctionProgress: 0.48, object: { x: 1880, y: 6820 }, color: 'rgba(251,113,133,0.18)', width: 80  },
-  { label: 'z+1', junctionProgress: 0.52, object: { x: 620,  y: 7180 }, color: 'rgba(110,231,183,0.18)', width: 75  },
-  { label: 'z+2', junctionProgress: 0.54, object: { x: 1880, y: 7380 }, color: 'rgba(253,230,138,0.18)', width: 70  },
+  { label: 'alpha', x: 560,  y: 6500, color: 'rgba(45,212,191,1)',  size: 120 },
+  { label: 'beta',  x: 1900, y: 6700, color: 'rgba(251,113,133,1)', size: 90  },
+  { label: 'gamma', x: 480,  y: 7400, color: 'rgba(110,231,183,1)', size: 100 },
+  { label: 'delta', x: 1850, y: 7500, color: 'rgba(253,230,138,1)', size: 80  },
 ]
-
-// Legacy aliases
-export type Spur = Highpoint
-export const ABYSS3_SPURS = ABYSS3_HIGHPOINTS
-
-export function spurJunction(s: Highpoint): { x: number; y: number } {
-  return evalSpline(s.junctionProgress)
-}
-
-// Thorn / branch shape — wide at the spine root, tapering to the object tip.
-// Two cubic bezier edges grow from the spine junction, meeting at the object.
-// Left edge curves one way, right edge the other — natural organic branch.
-export function spurRibbonPath(s: Highpoint): string {
-  const j  = spurJunction(s)
-  const ox = s.object.x
-  const oy = s.object.y
-  const w  = s.width   // half-width at the root
-
-  // Spine tangent — root direction
-  const tang = evalTangent(s.junctionProgress)
-  const tlen = Math.sqrt(tang.dx ** 2 + tang.dy ** 2) || 1
-  const tx   = tang.dx / tlen   // along-spine unit
-  const ty   = tang.dy / tlen
-  const px   = -ty              // perpendicular unit (left)
-  const py   =  tx
-
-  // Root edge points on the spine (left and right of junction)
-  const rlx = j.x + px * w
-  const rly = j.y + py * w
-  const rrx = j.x - px * w
-  const rry = j.y - py * w
-
-  // Vector from junction to object
-  const dx   = ox - j.x
-  const dy   = oy - j.y
-  const dist = Math.sqrt(dx ** 2 + dy ** 2) || 1
-
-  // Control points: each edge curves from its root corner toward the object.
-  // The "bow" pushes each edge outward before converging at the tip.
-  const bow = dist * 0.45
-  const f   = (n: number) => n.toFixed(1)
-
-  // Left edge: root-left → control (pushed left) → object tip
-  const cl1x = rlx + dx * 0.5 + px * bow
-  const cl1y = rly + dy * 0.5 + py * bow
-  const cl2x = ox  + px * w * 0.15
-  const cl2y = oy  + py * w * 0.15
-
-  // Right edge: object tip → control (pushed right) → root-right
-  const cr1x = ox  - px * w * 0.15
-  const cr1y = oy  - py * w * 0.15
-  const cr2x = rrx + dx * 0.5 - px * bow
-  const cr2y = rry + dy * 0.5 - py * bow
-
-  return [
-    `M ${f(rlx)} ${f(rly)}`,
-    `C ${f(cl1x)} ${f(cl1y)}, ${f(cl2x)} ${f(cl2y)}, ${f(ox)} ${f(oy)}`,   // left edge to tip
-    `C ${f(cr1x)} ${f(cr1y)}, ${f(cr2x)} ${f(cr2y)}, ${f(rrx)} ${f(rry)}`, // right edge back
-    `A ${f(w)} ${f(w)} 0 0 1 ${f(rlx)} ${f(rly)}`,  // arc closing the root
-    'Z',
-  ].join(' ')
-}
-
-// Centerline — straight bezier from junction to object tip
-export function spurCenterPath(s: Highpoint): string {
-  const j  = spurJunction(s)
-  const ox = s.object.x
-  const oy = s.object.y
-  const mx = (j.x + ox) / 2
-  const my = (j.y + oy) / 2
-  const f  = (n: number) => n.toFixed(1)
-  return `M ${f(j.x)} ${f(j.y)} Q ${f(mx)} ${f(my)}, ${f(ox)} ${f(oy)}`
-}
-
-export function spurObjectAngle(s: Spur): number {
-  const j  = spurJunction(s)
-  const dx = s.object.x - j.x
-  const dy = s.object.y - j.y
-  return Math.atan2(dx, dy) * (180 / Math.PI)
-}
 
 // Cursor world position — used by useDwell to detect hover over objects
 export const cursorWorldX = ref(0)

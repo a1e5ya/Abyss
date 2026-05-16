@@ -31,20 +31,23 @@ export function useWorldCamera(pathProgress: Ref<number>) {
     cubicBezier(PATH.p0.y, PATH.p1.y, PATH.p2.y, PATH.p3.y, pathProgress.value)
   )
 
-  // Tangent direction → rotation angle in degrees
-  // Clamped to ±8°. Stations hold ~2–3° (never fully 0).
+  // Tangent angle: how much the path is turning at this point.
+  // atan2(dx, dy) gives the angle of the tangent relative to straight-down (the drone's forward).
+  // No clamp — full rotation so the tangent is always aligned with the viewport's vertical axis.
   const rotation = computed(() => {
     const dx = cubicBezierDerivative(PATH.p0.x, PATH.p1.x, PATH.p2.x, PATH.p3.x, pathProgress.value)
     const dy = cubicBezierDerivative(PATH.p0.y, PATH.p1.y, PATH.p2.y, PATH.p3.y, pathProgress.value)
-    const angle = Math.atan2(dx, dy) * (180 / Math.PI)
-    return Math.max(-8, Math.min(8, angle))
+    return Math.atan2(dx, dy) * (180 / Math.PI)
   })
 
-  // CSS transform applied to the world container.
-  // calc(50vw - cameraX) places the camera point at the viewport's horizontal center,
-  // calc(50vh - cameraY) places it at the vertical center.
+  // Three-step transform — order matters:
+  // 1. translate(-cameraX, -cameraY): bring camera point to world origin
+  // 2. rotate(θ): rotate world so the path tangent points straight up
+  // 3. translate(50vw, 50vh): move world origin to viewport center
+  // CSS applies right-to-left, so we write it left-to-right as:
+  // translate(50vw, 50vh) rotate(θ) translate(-cameraX, -cameraY)
   const worldTransform = computed(() =>
-    `translate(calc(50vw - ${cameraX.value}px), calc(50vh - ${cameraY.value}px)) rotate(${rotation.value}deg)`
+    `translate(50vw, 50vh) rotate(${rotation.value}deg) translate(${-cameraX.value}px, ${-cameraY.value}px)`
   )
 
   return { cameraX, cameraY, rotation, worldTransform }

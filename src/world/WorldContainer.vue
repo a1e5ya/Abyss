@@ -66,7 +66,7 @@ const { cameraX, cameraY, rotation, worldTransform } = useWorldCamera(pathProgre
   top: 0;
   left: 0;
   width: 4000px;
-  transform-origin: 50vw 50vh;
+  transform-origin: 0 0;
   will-change: transform;
 }
 

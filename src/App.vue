@@ -4,7 +4,7 @@ import WorldContainer from './world/WorldContainer.vue'
 import {
   WAYPOINTS, ABYSS3_SPURS,
   getTangentAngle, buildSvgPath, progressOf,
-  spurSvgPath, spurObjectAngle,
+  spurSvgPath, spurObjectAngle, spurJunction,
 } from './composables/useWorldCamera'
 import { useViewport } from './composables/useViewport'
 
@@ -142,10 +142,10 @@ const svgPath = buildSvgPath()
         stroke-width="1.5"
         stroke-dasharray="6 5"
       />
-      <!-- Spur junction dots -->
+      <!-- Spur junction dots — computed from spine, guaranteed on-curve -->
       <circle
         v-for="spur in ABYSS3_SPURS" :key="'j-'+spur.label"
-        :cx="spur.junction.x" :cy="spur.junction.y"
+        :cx="spurJunction(spur).x" :cy="spurJunction(spur).y"
         r="4" :fill="spur.color"
       />
 

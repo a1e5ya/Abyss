@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { dwellTarget, dwellProgress, dwellActive } from '../composables/useDwell'
+import { spurJunction } from '../composables/useWorldCamera'
 
-// SVG ring parameters
-const R = 22
+const R    = 22
 const CIRC = 2 * Math.PI * R
 
 const strokeDash = computed(() => {
@@ -11,8 +11,8 @@ const strokeDash = computed(() => {
   return `${filled} ${CIRC - filled}`
 })
 
-const junctionX = computed(() => dwellTarget.value?.junction.x ?? 0)
-const junctionY = computed(() => dwellTarget.value?.junction.y ?? 0)
+const junctionX = computed(() => dwellTarget.value ? spurJunction(dwellTarget.value).x : 0)
+const junctionY = computed(() => dwellTarget.value ? spurJunction(dwellTarget.value).y : 0)
 const color      = computed(() => dwellTarget.value?.color ?? 'white')
 </script>
 

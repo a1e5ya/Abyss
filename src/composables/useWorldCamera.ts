@@ -1,8 +1,7 @@
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Ref } from 'vue'
 
-// ── Main spine ────────────────────────────────────────────────────────────────
-// One clean path through the world. Camera always follows this.
+// ── Main spine waypoints ──────────────────────────────────────────────────────
 export const WAYPOINTS = [
   { x: 2000, y: 0,     label: 'hero'     },
   { x: 1200, y: 1400,  label: 'abyss1'   },
@@ -17,60 +16,6 @@ export const WAYPOINTS = [
   { x: 2000, y: 14000, label: 'contacts' },
 ]
 
-// ── Spurs ─────────────────────────────────────────────────────────────────────
-// Each spur is a short sub-path that leaves the spine at a junction point,
-// reaches an object, and is a dead-end (camera doesn't follow it automatically).
-// They are purely geometric — used for SVG drawing and object placement.
-export interface Spur {
-  label: string
-  junction: { x: number; y: number }  // where spur departs the spine
-  object:   { x: number; y: number }  // where the object sits
-  color: string
-}
-
-// Spine passes through x=1200, y=7000.
-// Spurs branch left and right alternately, all staying within world bounds.
-export const ABYSS3_SPURS: Spur[] = [
-  {
-    label:    'z-2',
-    junction: { x: 1250, y: 6700 },
-    object:   { x: 600,  y: 6650 },
-    color:    'rgba(45,212,191,0.5)',
-  },
-  {
-    label:    'z-1',
-    junction: { x: 1150, y: 6900 },
-    object:   { x: 1800, y: 6820 },
-    color:    'rgba(251,113,133,0.5)',
-  },
-  {
-    label:    'z+1',
-    junction: { x: 1250, y: 7100 },
-    object:   { x: 600,  y: 7200 },
-    color:    'rgba(110,231,183,0.6)',
-  },
-  {
-    label:    'z+2',
-    junction: { x: 1150, y: 7300 },
-    object:   { x: 1800, y: 7380 },
-    color:    'rgba(253,230,138,0.6)',
-  },
-]
-
-// Spur path as SVG string — straight line from junction to object
-export function spurSvgPath(s: Spur): string {
-  const mx = (s.junction.x + s.object.x) / 2
-  const my = (s.junction.y + s.object.y) / 2 - 60
-  return `M ${s.junction.x} ${s.junction.y} Q ${mx} ${my} ${s.object.x} ${s.object.y}`
-}
-
-// Tangent angle at the object end of a spur (for counter-rotating the object)
-export function spurObjectAngle(s: Spur): number {
-  const dx = s.object.x - s.junction.x
-  const dy = s.object.y - s.junction.y
-  return Math.atan2(dx, dy) * (180 / Math.PI)
-}
-
 // ── Catmull-Rom spine math ────────────────────────────────────────────────────
 function cr(p0: number, p1: number, p2: number, p3: number, t: number): number {
   return 0.5 * (
@@ -81,12 +26,12 @@ function cr(p0: number, p1: number, p2: number, p3: number, t: number): number {
   )
 }
 
-function evalSpline(progress: number) {
-  const pts = WAYPOINTS
+export function evalSpline(progress: number): { x: number; y: number } {
+  const pts  = WAYPOINTS
   const segs = pts.length - 1
   const scaled = Math.min(progress * segs, segs - 0.0001)
-  const i = Math.floor(scaled)
-  const t = scaled - i
+  const i  = Math.floor(scaled)
+  const t  = scaled - i
   const p0 = pts[Math.max(0, i - 1)]
   const p1 = pts[i]
   const p2 = pts[i + 1]
@@ -106,8 +51,7 @@ function evalTangent(progress: number) {
 
 export function progressOf(label: string): number {
   const i = WAYPOINTS.findIndex(w => w.label === label)
-  if (i < 0) return 0
-  return i / (WAYPOINTS.length - 1)
+  return i < 0 ? 0 : i / (WAYPOINTS.length - 1)
 }
 
 export function getTangentAngle(progress: number): number {
@@ -132,18 +76,59 @@ export function buildSvgPath(): string {
   return d
 }
 
-import { ref as vref } from 'vue'
+// ── Spurs ─────────────────────────────────────────────────────────────────────
+// junctionProgress maps to an exact spine point via evalSpline().
+// This guarantees the spur visually starts on the curve, not beside it.
+export interface Spur {
+  label:            string
+  junctionProgress: number
+  object:           { x: number; y: number }
+  color:            string
+}
 
-// When set, the camera travels to this world position instead of following the spine.
-// useDwell writes here; null means follow the spine normally.
-export const cameraOverridePos = vref<{ x: number; y: number } | null>(null)
+// Abyss3 waypoint = index 5 of 10 segments → progress 0.5.
+// Four spurs spaced around that point, alternating left/right.
+export const ABYSS3_SPURS: Spur[] = [
+  { label: 'z-2', junctionProgress: 0.46, object: { x: 600,  y: 6600 }, color: 'rgba(45,212,191,0.5)'  },
+  { label: 'z-1', junctionProgress: 0.48, object: { x: 1900, y: 6800 }, color: 'rgba(251,113,133,0.5)' },
+  { label: 'z+1', junctionProgress: 0.52, object: { x: 600,  y: 7200 }, color: 'rgba(110,231,183,0.6)' },
+  { label: 'z+2', junctionProgress: 0.54, object: { x: 1900, y: 7400 }, color: 'rgba(253,230,138,0.6)' },
+]
 
+export function spurJunction(s: Spur): { x: number; y: number } {
+  return evalSpline(s.junctionProgress)
+}
+
+export function spurSvgPath(s: Spur): string {
+  const j  = spurJunction(s)
+  const mx = (j.x + s.object.x) / 2
+  const my = (j.y + s.object.y) / 2
+  return `M ${j.x.toFixed(1)} ${j.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${s.object.x} ${s.object.y}`
+}
+
+export function spurObjectAngle(s: Spur): number {
+  const j  = spurJunction(s)
+  const dx = s.object.x - j.x
+  const dy = s.object.y - j.y
+  return Math.atan2(dx, dy) * (180 / Math.PI)
+}
+
+// ── Camera override ───────────────────────────────────────────────────────────
+// useDwell writes here to move the camera off-spine to an object.
+// null = follow spine normally.
+export const cameraOverridePos = ref<{ x: number; y: number } | null>(null)
+
+// ── Main composable ───────────────────────────────────────────────────────────
 export function useWorldCamera(pathProgress: Ref<number>) {
   const cameraX = computed(() =>
-    cameraOverridePos.value !== null ? cameraOverridePos.value.x : evalSpline(pathProgress.value).x
+    cameraOverridePos.value !== null
+      ? cameraOverridePos.value.x
+      : evalSpline(pathProgress.value).x
   )
   const cameraY = computed(() =>
-    cameraOverridePos.value !== null ? cameraOverridePos.value.y : evalSpline(pathProgress.value).y
+    cameraOverridePos.value !== null
+      ? cameraOverridePos.value.y
+      : evalSpline(pathProgress.value).y
   )
 
   const rotation = computed(() => {

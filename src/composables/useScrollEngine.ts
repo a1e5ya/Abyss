@@ -1,23 +1,29 @@
 import { ref, onMounted, onUnmounted } from 'vue'
+import { cameraOverridePos } from './useWorldCamera'
 
 const WORLD_HEIGHT = 14000
-const LERP_FACTOR = 0.075
+const LERP_FACTOR  = 0.075
 
-// Shared singleton state
 const scrollY       = ref(0)
 const smoothScrollY = ref(0)
 const pathProgress  = ref(0)
 
-// When overrideProgress is set, the camera ignores scroll and uses this value.
-// Set to null to return control to scroll.
 export const overrideProgress = ref<number | null>(null)
 
 let rafId: number
 let scrollContainer: HTMLElement | null = null
 let instanceCount = 0
+let lastScrollY = 0
 
 function onScroll() {
-  scrollY.value = scrollContainer?.scrollTop ?? window.scrollY
+  const newY = scrollContainer?.scrollTop ?? window.scrollY
+  // Any scroll movement while an override is active releases it
+  if (newY !== lastScrollY && cameraOverridePos.value !== null) {
+    cameraOverridePos.value = null
+    overrideProgress.value  = null
+  }
+  lastScrollY   = newY
+  scrollY.value = newY
 }
 
 function tick() {

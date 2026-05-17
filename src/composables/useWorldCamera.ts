@@ -139,9 +139,8 @@ export function useWorldCamera(pathProgress: Ref<number>) {
   // cursorNudge is injected by WorldContainer after useCursor() is available.
   // Default: no nudge. Using a module-level ref so it survives across composable calls.
   const worldTransform = computed(() => {
-    const nx = cursorNudgeX.value
-    const ny = cursorNudgeY.value
-    // Nudge is applied BEFORE the camera translation — shifts the world in screen space
+    const nx = cursorNudgeX.value + highpointNudgeX.value
+    const ny = cursorNudgeY.value + highpointNudgeY.value
     return `translate(50vw, 50vh) translate(${-nx}px, ${-ny}px) rotate(${rotation.value}deg) translate(${-cameraX.value}px, ${-cameraY.value}px)`
   })
 
@@ -151,3 +150,7 @@ export function useWorldCamera(pathProgress: Ref<number>) {
 // Written by WorldContainer from cursorSx/Sy
 export const cursorNudgeX = ref(0)
 export const cursorNudgeY = ref(0)
+
+// Written by useDwell — additive pull toward nearest highpoint
+export const highpointNudgeX = ref(0)
+export const highpointNudgeY = ref(0)

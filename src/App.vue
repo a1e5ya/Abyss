@@ -34,6 +34,20 @@ const ABYSS1_OBJECTS = [
 // Abyss 3 center glow radius
 const ABYSS3_GLOW_R = 600
 
+const abyss3Wp = WAYPOINTS.find(w => w.label === 'abyss3')!
+
+function abyss3StationStyle() {
+  const progress = progressOf('abyss3')
+  const angle    = getTangentAngle(progress)
+  return {
+    left:      `${abyss3Wp.x}px`,
+    top:       `${abyss3Wp.y}px`,
+    width:     `${stationW.value}px`,
+    height:    `100dvh`,
+    transform: `translate(-50%, -50%) rotate(${-angle}deg)`,
+  }
+}
+
 function stationStyle(wpLabel: string) {
   const progress = progressOf(wpLabel)
   const angle = getTangentAngle(progress)
@@ -100,6 +114,11 @@ const svgPath = buildSvgPath()
     >
       <span>{{ s.label }}</span>
       <small>{{ stationW }} × {{ stationH }}</small>
+    </div>
+
+    <!-- Abyss 3 station — 100dvh, highpoints float inside -->
+    <div class="station abyss3-station" :style="abyss3StationStyle()">
+      <span>ABYSS 3</span>
     </div>
 
     <!-- Abyss labels -->

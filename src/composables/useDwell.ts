@@ -1,57 +1,54 @@
 import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
-import { ABYSS3_HIGHPOINTS, ABYSS3_CENTER, cameraOverridePos, cursorWorldX, cursorWorldY } from './useWorldCamera'
-import { alignScrollToY } from './useScrollEngine'
+import { ABYSS3_HIGHPOINTS, ABYSS3_CENTER, cursorWorldX, cursorWorldY, highpointNudgeX, highpointNudgeY } from './useWorldCamera'
 import type { Highpoint } from './useWorldCamera'
 
-const ATTRACT_RADIUS = 700   // world-px from highpoint center
-const ATTRACT_LERP   = 0.004
-const RETURN_LERP    = 0.003
-const DWELL_SECONDS  = 0.5
+// How far from a highpoint the cursor starts pulling (world px)
+const ATTRACT_RADIUS = 800
+// Per-frame lerp toward highpoint offset — very gentle
+const PULL_LERP      = 0.025
+// Per-frame lerp back to zero when no target
+const RELEASE_LERP   = 0.018
+// Max pull distance in world px
+const MAX_PULL       = 500
 
 export const highpointTarget   = ref<Highpoint | null>(null)
 export const highpointProgress = ref(0)
 export const highpointActive   = ref(false)
 
-// Aliases for DwellIndicator
+// DwellIndicator aliases
 export const dwellTarget   = highpointTarget
 export const dwellProgress = highpointProgress
 export const dwellActive   = highpointActive
 
-let dwellTimer: ReturnType<typeof setTimeout> | null = null
+// No longer used — kept so useScrollEngine import doesn't break
+export function onScrollWhileExcursing() {}
+export function startReturn() {}
+
 let rafId: number | null = null
-let returning = false
-let progressFillStart = 0
 
 function lerp(a: number, b: number, t: number) { return a + (b - a) * t }
+function clamp(v: number, max: number) { return Math.max(-max, Math.min(max, v)) }
 
 function tick() {
   const target = highpointTarget.value
 
-  if (highpointActive.value && target) {
-    const cur = cameraOverridePos.value ?? { x: ABYSS3_CENTER.x, y: ABYSS3_CENTER.y }
-    cameraOverridePos.value = {
-      x: lerp(cur.x, target.x, ATTRACT_LERP),
-      y: lerp(cur.y, target.y, ATTRACT_LERP),
-    }
-    const elapsed = (Date.now() - progressFillStart) / (DWELL_SECONDS * 1000)
-    highpointProgress.value = Math.min(elapsed, 1)
-
-  } else if (returning && cameraOverridePos.value) {
-    const cur = cameraOverridePos.value
-    const nx  = lerp(cur.x, ABYSS3_CENTER.x, RETURN_LERP)
-    const ny  = lerp(cur.y, ABYSS3_CENTER.y, RETURN_LERP)
-
-    if (Math.abs(nx - ABYSS3_CENTER.x) < 8 && Math.abs(ny - ABYSS3_CENTER.y) < 8) {
-      alignScrollToY(ABYSS3_CENTER.y)
-      cameraOverridePos.value = null
-      returning               = false
-      highpointTarget.value   = null
-      highpointProgress.value = 0
-    } else {
-      cameraOverridePos.value = { x: nx, y: ny }
-    }
+  if (target) {
+    // Pull camera toward the highpoint offset from ABYSS3_CENTER
+    const targetNudgeX = clamp(target.x - ABYSS3_CENTER.x, MAX_PULL)
+    const targetNudgeY = clamp(target.y - ABYSS3_CENTER.y, MAX_PULL)
+    highpointNudgeX.value = lerp(highpointNudgeX.value, targetNudgeX, PULL_LERP)
+    highpointNudgeY.value = lerp(highpointNudgeY.value, targetNudgeY, PULL_LERP)
   } else {
+    // Drift back to zero
+    highpointNudgeX.value = lerp(highpointNudgeX.value, 0, RELEASE_LERP)
+    highpointNudgeY.value = lerp(highpointNudgeY.value, 0, RELEASE_LERP)
+  }
+
+  const settled = Math.abs(highpointNudgeX.value) < 0.5 && Math.abs(highpointNudgeY.value) < 0.5
+  if (!target && settled) {
+    highpointNudgeX.value = 0
+    highpointNudgeY.value = 0
     rafId = null
     return
   }
@@ -61,56 +58,6 @@ function tick() {
 
 function ensureRaf() {
   if (rafId === null) rafId = requestAnimationFrame(tick)
-}
-
-export function startReturn() {
-  if (returning) return
-  returning             = true
-  highpointActive.value = false
-  clearDwellTimer()
-  ensureRaf()
-}
-
-function releaseNow() {
-  // Immediate release — user is scrolling, don't fight them.
-  if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
-  returning               = false
-  highpointActive.value   = false
-  highpointTarget.value   = null
-  highpointProgress.value = 0
-  clearDwellTimer()
-  cameraOverridePos.value = null
-}
-
-export function onScrollWhileExcursing() {
-  if (highpointActive.value || returning) releaseNow()
-}
-
-function clearDwellTimer() {
-  if (dwellTimer !== null) { clearTimeout(dwellTimer); dwellTimer = null }
-}
-
-function startDwell(hp: Highpoint, cameraX: Ref<number>, cameraY: Ref<number>) {
-  if (highpointTarget.value?.label === hp.label) return
-  clearDwellTimer()
-  highpointTarget.value   = hp
-  highpointProgress.value = 0
-  progressFillStart       = Date.now()
-  cameraOverridePos.value = { x: cameraX.value, y: cameraY.value }
-
-  dwellTimer = setTimeout(() => {
-    highpointActive.value = true
-    ensureRaf()
-  }, DWELL_SECONDS * 1000)
-}
-
-function cancelDwell() {
-  clearDwellTimer()
-  if (!highpointActive.value && !returning) {
-    cameraOverridePos.value = null
-    highpointTarget.value   = null
-    highpointProgress.value = 0
-  }
 }
 
 function nearest(wx: number, wy: number): { hp: Highpoint; dist: number } | null {
@@ -126,25 +73,23 @@ function nearest(wx: number, wy: number): { hp: Highpoint; dist: number } | null
 
 export function useDwell(cameraX: Ref<number>, cameraY: Ref<number>) {
   watch([cursorWorldX, cursorWorldY], ([wx, wy]) => {
-    if (returning) return
-
     const hit = nearest(wx, wy)
 
-    if (highpointActive.value) {
-      // Point-to-point: redirect to closer highpoint
-      if (hit && hit.dist < ATTRACT_RADIUS && hit.hp.label !== highpointTarget.value?.label) {
-        highpointTarget.value   = hit.hp
-        progressFillStart       = Date.now()
+    if (!hit || hit.dist > ATTRACT_RADIUS) {
+      if (highpointTarget.value) {
+        highpointTarget.value   = null
+        highpointActive.value   = false
         highpointProgress.value = 0
         ensureRaf()
       }
       return
     }
 
-    if (!hit || hit.dist > ATTRACT_RADIUS) {
-      cancelDwell()
-      return
+    if (highpointTarget.value?.label !== hit.hp.label) {
+      highpointTarget.value   = hit.hp
+      highpointActive.value   = true
+      highpointProgress.value = 1
+      ensureRaf()
     }
-    startDwell(hit.hp, cameraX, cameraY)
   })
 }

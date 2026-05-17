@@ -6,11 +6,11 @@ import type { Highpoint } from './useWorldCamera'
 // How far from a highpoint the cursor starts pulling (world px)
 const ATTRACT_RADIUS = 800
 // Per-frame lerp toward highpoint offset — very gentle
-const PULL_LERP      = 0.025
+const PULL_LERP      = 0.003
 // Per-frame lerp back to zero when no target
-const RELEASE_LERP   = 0.018
+const RELEASE_LERP   = 0.002
 // Max pull distance in world px
-const MAX_PULL       = 500
+const MAX_PULL       = 180
 
 export const highpointTarget   = ref<Highpoint | null>(null)
 export const highpointProgress = ref(0)

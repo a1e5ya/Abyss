@@ -81,7 +81,7 @@ function nearest(wx: number, wy: number): { hp: Highpoint; dist: number } | null
   return best
 }
 
-export function useDwell(cameraX: Ref<number>, cameraY: Ref<number>) {
+export function useDwell(_cameraX: Ref<number>, _cameraY: Ref<number>) {
   watch([cursorWorldX, cursorWorldY], ([wx, wy]) => {
     const hit = nearest(wx, wy)
 

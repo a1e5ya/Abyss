@@ -6,7 +6,7 @@ import { useCursor } from '../composables/useCursor'
 import { useDwell } from '../composables/useDwell'
 import DwellIndicator from './DwellIndicator.vue'
 
-const { pathProgress, smoothScrollY } = useScrollEngine()
+const { pathProgress } = useScrollEngine()
 const { cameraX, cameraY, rotation, worldTransform } = useWorldCamera(pathProgress)
 const { cursorSx, cursorSy, cursorVx, cursorVy, NUDGE_STRENGTH } = useCursor()
 

@@ -89,16 +89,6 @@ export function buildSvgPath(): string {
 }
 
 // ── Abyss 3 highpoints ────────────────────────────────────────────────────────
-// Floating objects around a central atmospheric zone.
-// No connections, no ribbons — just positions in world space.
-export interface Highpoint {
-  label:  string
-  x:      number
-  y:      number
-  color:  string   // full rgba string used for glow and dwell ring
-  size:   number   // diameter in px
-}
-
 // Center of the Abyss 3 zone — spine waypoint
 export const ABYSS3_CENTER = { x: 1200, y: 7000 }
 

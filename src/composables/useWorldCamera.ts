@@ -99,15 +99,32 @@ export interface Highpoint {
   size:   number   // diameter in px
 }
 
-// Center of the Abyss 3 zone — spine passes near x=1200, y=7000
+// Center of the Abyss 3 zone — spine waypoint
 export const ABYSS3_CENTER = { x: 1200, y: 7000 }
 
+export interface Highpoint {
+  label:  string
+  px:     number   // 0–1 fraction of station width  (left→right)
+  py:     number   // 0–1 fraction of station height (top→bottom)
+  color:  string
+  size:   number
+}
+
 export const ABYSS3_HIGHPOINTS: Highpoint[] = [
-  { label: 'alpha', x: 560,  y: 6500, color: 'rgba(45,212,191,1)',  size: 120 },
-  { label: 'beta',  x: 1900, y: 6700, color: 'rgba(251,113,133,1)', size: 90  },
-  { label: 'gamma', x: 480,  y: 7400, color: 'rgba(110,231,183,1)', size: 100 },
-  { label: 'delta', x: 1850, y: 7500, color: 'rgba(253,230,138,1)', size: 80  },
+  { label: 'alpha', px: 0.18, py: 0.22, color: 'rgba(45,212,191,1)',  size: 120 },
+  { label: 'beta',  px: 0.82, py: 0.30, color: 'rgba(251,113,133,1)', size: 90  },
+  { label: 'gamma', px: 0.15, py: 0.70, color: 'rgba(110,231,183,1)', size: 100 },
+  { label: 'delta', px: 0.80, py: 0.76, color: 'rgba(253,230,138,1)', size: 80  },
 ]
+
+// Convert fraction-based highpoint to world coords given the station dimensions.
+// stationW = station width in px, stationH = station height in px (100dvh).
+export function highpointWorldPos(hp: Highpoint, stationW: number, stationH: number) {
+  return {
+    x: ABYSS3_CENTER.x + (hp.px - 0.5) * stationW,
+    y: ABYSS3_CENTER.y + (hp.py - 0.5) * stationH,
+  }
+}
 
 // Cursor world position — used by useDwell to detect hover over objects
 export const cursorWorldX = ref(0)

@@ -85,17 +85,17 @@ function abyss1ObjStyle(obj: typeof ABYSS1_OBJECTS[0]) {
 }
 
 function highpointStyle(hp: typeof ABYSS3_HIGHPOINTS[0]) {
-  const isActive = highpointActive.value && highpointTarget.value?.label === hp.label
+  const isActive  = highpointActive.value && highpointTarget.value?.label === hp.label
   const isPending = !highpointActive.value && highpointTarget.value?.label === hp.label
-  const scale = isActive ? 1.25 : isPending ? 1.08 : 1
+  const scale     = isActive ? 1.25 : isPending ? 1.08 : 1
   return {
-    left:      `${hp.x}px`,
-    top:       `${hp.y}px`,
-    width:     `${hp.size}px`,
-    height:    `${hp.size}px`,
+    left:       `${hp.px * 100}%`,
+    top:        `${hp.py * 100}%`,
+    width:      `${hp.size}px`,
+    height:     `${hp.size}px`,
     background: `radial-gradient(circle, ${hp.color} 0%, ${hp.color.replace(',1)', ',0)')} 100%)`,
-    transform: `translate(-50%, -50%) scale(${scale})`,
-    boxShadow: isActive ? `0 0 60px 20px ${hp.color.replace(',1)', ',0.35)')}` : 'none',
+    transform:  `translate(-50%, -50%) scale(${scale})`,
+    boxShadow:  isActive ? `0 0 60px 20px ${hp.color.replace(',1)', ',0.35)')}` : 'none',
     transition: 'transform 1.5s ease, box-shadow 1.5s ease',
   }
 }
@@ -119,6 +119,11 @@ const svgPath = buildSvgPath()
     <!-- Abyss 3 station — 100dvh, highpoints float inside -->
     <div class="station abyss3-station" :style="abyss3StationStyle()">
       <span>ABYSS 3</span>
+      <div
+        v-for="hp in ABYSS3_HIGHPOINTS" :key="'hp-'+hp.label"
+        class="highpoint"
+        :style="highpointStyle(hp)"
+      />
     </div>
 
     <!-- Abyss labels -->
@@ -133,13 +138,6 @@ const svgPath = buildSvgPath()
       v-for="obj in ABYSS1_OBJECTS" :key="'a1-'+obj.zText"
       class="depth-obj"
       :style="abyss1ObjStyle(obj)"
-    />
-
-    <!-- Abyss 3 highpoints — floating objects around the central zone -->
-    <div
-      v-for="hp in ABYSS3_HIGHPOINTS" :key="'hp-'+hp.label"
-      class="highpoint"
-      :style="highpointStyle(hp)"
     />
 
     <!-- Path spine -->
@@ -209,6 +207,9 @@ const svgPath = buildSvgPath()
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
+}
+.abyss3-station {
+  overflow: visible;
 }
 .highpoint {
   position: absolute;

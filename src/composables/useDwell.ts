@@ -1,6 +1,7 @@
 import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
-import { ABYSS3_HIGHPOINTS, ABYSS3_CENTER, cursorWorldX, cursorWorldY, highpointNudgeX, highpointNudgeY } from './useWorldCamera'
+import { ABYSS3_HIGHPOINTS, ABYSS3_CENTER, highpointWorldPos, cursorWorldX, cursorWorldY, highpointNudgeX, highpointNudgeY } from './useWorldCamera'
+import { useViewport } from './useViewport'
 import type { Highpoint } from './useWorldCamera'
 
 // How far from a highpoint the cursor starts pulling (world px)
@@ -27,6 +28,12 @@ export function startReturn() {}
 
 let rafId: number | null = null
 
+const { vw, vh } = useViewport()
+
+// Station width matches stationW formula in App.vue
+function stationW() { return Math.round(Math.min(vw.value, Math.max(vw.value * 0.5, vh.value * vw.value / vh.value))) }
+function stationH() { return vh.value }  // 100dvh
+
 function lerp(a: number, b: number, t: number) { return a + (b - a) * t }
 function clamp(v: number, max: number) { return Math.max(-max, Math.min(max, v)) }
 
@@ -34,9 +41,9 @@ function tick() {
   const target = highpointTarget.value
 
   if (target) {
-    // Pull camera toward the highpoint offset from ABYSS3_CENTER
-    const targetNudgeX = clamp(target.x - ABYSS3_CENTER.x, MAX_PULL)
-    const targetNudgeY = clamp(target.y - ABYSS3_CENTER.y, MAX_PULL)
+    const wp = highpointWorldPos(target, stationW(), stationH())
+    const targetNudgeX = clamp(wp.x - ABYSS3_CENTER.x, MAX_PULL)
+    const targetNudgeY = clamp(wp.y - ABYSS3_CENTER.y, MAX_PULL)
     highpointNudgeX.value = lerp(highpointNudgeX.value, targetNudgeX, PULL_LERP)
     highpointNudgeY.value = lerp(highpointNudgeY.value, targetNudgeY, PULL_LERP)
   } else {
@@ -62,9 +69,12 @@ function ensureRaf() {
 
 function nearest(wx: number, wy: number): { hp: Highpoint; dist: number } | null {
   let best: { hp: Highpoint; dist: number } | null = null
+  const sw = stationW()
+  const sh = stationH()
   for (const hp of ABYSS3_HIGHPOINTS) {
-    const dx   = wx - hp.x
-    const dy   = wy - hp.y
+    const wp   = highpointWorldPos(hp, sw, sh)
+    const dx   = wx - wp.x
+    const dy   = wy - wp.y
     const dist = Math.sqrt(dx * dx + dy * dy)
     if (!best || dist < best.dist) best = { hp, dist }
   }

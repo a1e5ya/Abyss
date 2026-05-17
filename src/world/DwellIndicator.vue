@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { dwellTarget, dwellProgress, dwellActive } from '../composables/useDwell'
-import { highpointWorldPos, ABYSS3_CENTER } from '../composables/useWorldCamera'
+import { highpointWorldPos } from '../composables/useWorldCamera'
 import { useViewport } from '../composables/useViewport'
 
 const R    = 28

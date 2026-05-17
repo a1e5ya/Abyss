@@ -71,8 +71,19 @@ export function startReturn() {
   ensureRaf()
 }
 
+function releaseNow() {
+  // Immediate release — user is scrolling, don't fight them.
+  if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+  returning               = false
+  highpointActive.value   = false
+  highpointTarget.value   = null
+  highpointProgress.value = 0
+  clearDwellTimer()
+  cameraOverridePos.value = null
+}
+
 export function onScrollWhileExcursing() {
-  if (highpointActive.value || returning) startReturn()
+  if (highpointActive.value || returning) releaseNow()
 }
 
 function clearDwellTimer() {

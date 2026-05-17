@@ -1,18 +1,27 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { dwellTarget, dwellProgress, dwellActive } from '../composables/useDwell'
+import { highpointWorldPos, ABYSS3_CENTER } from '../composables/useWorldCamera'
+import { useViewport } from '../composables/useViewport'
 
 const R    = 28
 const CIRC = 2 * Math.PI * R
+
+const { vw, vh } = useViewport()
 
 const strokeDash = computed(() => {
   const filled = CIRC * dwellProgress.value
   return `${filled} ${CIRC - filled}`
 })
 
-// Ring draws at the object, not the junction — that's where the cursor is
-const ox    = computed(() => dwellTarget.value?.x ?? 0)
-const oy    = computed(() => dwellTarget.value?.y ?? 0)
+const pos = computed(() => {
+  const hp = dwellTarget.value
+  if (!hp) return { x: 0, y: 0 }
+  const sw = Math.round(Math.min(vw.value, Math.max(vw.value * 0.5, vh.value * vw.value / vh.value)))
+  return highpointWorldPos(hp, sw, vh.value)
+})
+const ox    = computed(() => pos.value.x)
+const oy    = computed(() => pos.value.y)
 const color = computed(() => dwellTarget.value?.color ?? 'white')
 </script>
 
